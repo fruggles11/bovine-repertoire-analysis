@@ -202,34 +202,31 @@ process IGBLAST_ANNOTATION {
 
     script:
     """
-    # Set up IgBLAST directory structure that mirrors IGDATA layout
+    # Set up IgBLAST directory structure
     mkdir -p igblast_data/database
-    mkdir -p igblast_data/internal_data/human
-    mkdir -p igblast_data/optional_file
 
-    # Copy database files - IgBLAST will look for these by the names we specify
+    # Copy our bovine database files
     cp ${db}/* igblast_data/database/ 2>/dev/null || true
 
-    # IgBLAST always looks for human internal_data even with custom databases
-    # Create human_gl.aux file (can be minimal/empty for custom databases)
-    cat > igblast_data/internal_data/human/human_gl.aux << 'AUXFILE'
-# Auxiliary data for IgBLAST
-# Using bovine germline databases
-AUXFILE
-
-    # Also create bovine directory for completeness
-    mkdir -p igblast_data/internal_data/bovine
-    cp igblast_data/internal_data/human/human_gl.aux igblast_data/internal_data/bovine/bovine_gl.aux
-
-    # Copy any existing internal_data from container
-    cp -r ${aux}/* igblast_data/internal_data/ 2>/dev/null || true
+    # Copy entire internal_data from container's IGDATA (includes human databases IgBLAST needs)
+    if [[ -n "\${IGDATA:-}" ]] && [[ -d "\${IGDATA}/internal_data" ]]; then
+        cp -r "\${IGDATA}/internal_data" igblast_data/
+    else
+        # Fallback: try common container paths
+        for path in /usr/local/share/igblast/internal_data /usr/share/igblast/internal_data; do
+            if [[ -d "\$path" ]]; then
+                cp -r "\$path" igblast_data/
+                break
+            fi
+        done
+    fi
 
     # Set IGDATA to our custom directory
     export IGDATA="\$(pwd)/igblast_data"
 
     # Run IgBLAST directly (AssignGenes.py doesn't support bovine)
-    # Use -organism human since IgBLAST requires a supported organism for internal_data lookup
-    # The actual annotation uses our bovine databases specified with -germline_db_*
+    # Use -organism human for internal_data validation (required by IgBLAST)
+    # The actual annotation uses our bovine databases via -germline_db_* flags
     igblastn \
         -query ${fasta} \
         -out ${sample_id}_igblast.fmt7 \
@@ -239,7 +236,6 @@ AUXFILE
         -germline_db_V "\${IGDATA}/database/bovine_V" \
         -germline_db_D "\${IGDATA}/database/bovine_D" \
         -germline_db_J "\${IGDATA}/database/bovine_J" \
-        -auxiliary_data "\${IGDATA}/internal_data/human/human_gl.aux" \
         -outfmt "7 std qseq sseq btop" \
         -domain_system imgt
     """
