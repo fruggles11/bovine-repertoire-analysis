@@ -170,15 +170,18 @@ process BUILD_IGBLAST_DB {
     cd ..
 
     # Create IgBLAST auxiliary data
-    # Copy internal data from IgBLAST installation
-    cp -r \${IGDATA}/internal_data/* internal_data/ 2>/dev/null || true
+    # Copy internal data from IgBLAST installation if IGDATA is set
+    if [[ -n "\${IGDATA:-}" ]] && [[ -d "\${IGDATA}/internal_data" ]]; then
+        cp -r "\${IGDATA}/internal_data/"* internal_data/ 2>/dev/null || true
+    fi
 
     # Create organism-specific files if not present
-    if [[ ! -f internal_data/bovine/bovine_gl.aux ]]; then
-        mkdir -p internal_data/bovine
-        # Create basic aux file for bovine
-        echo -e "# Bovine germline auxiliary data" > internal_data/bovine/bovine_gl.aux
-    fi
+    mkdir -p internal_data/bovine
+    # Create basic aux file for bovine (required for IgBLAST)
+    cat > internal_data/bovine/bovine_gl.aux << 'AUXFILE'
+# Bovine germline auxiliary data
+# Frame information for bovine IG genes
+AUXFILE
     """
 }
 
