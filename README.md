@@ -26,6 +26,7 @@ Analyzes antibody repertoire diversity from bovine IgG sequences using the [Immc
 cd /path/to/results/4_consensus_sequences
 
 # Collect all unique FASTA files
+mkdir -p analysis_input
 find . -name "*_unique.fasta" -exec cp {} ./analysis_input/ \;
 
 # Run the pipeline
