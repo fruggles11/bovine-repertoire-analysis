@@ -155,16 +155,44 @@ process BUILD_IGBLAST_DB {
     """
     mkdir -p database internal_data
 
-    # Separate V, D, J genes
-    cat *IGHV*.fasta *IGKV*.fasta *IGLV*.fasta 2>/dev/null > database/bovine_V.fasta || true
-    cat *IGHD*.fasta 2>/dev/null > database/bovine_D.fasta || true
-    cat *IGHJ*.fasta *IGKJ*.fasta *IGLJ*.fasta 2>/dev/null > database/bovine_J.fasta || true
+    # Debug: show what germline files we received
+    echo "Germline files received:" >&2
+    ls -la *.fasta 2>/dev/null >&2 || echo "No .fasta files found" >&2
 
-    # Build BLAST databases
+    # Separate V, D, J genes based on filename patterns
+    # Try multiple naming conventions (IMGT uses IGHV, some use just V, etc.)
+
+    # V genes
+    cat *IGHV*.fasta *IGKV*.fasta *IGLV*.fasta 2>/dev/null > database/bovine_V.fasta || true
+    cat *_V.fasta *_V_*.fasta *-V.fasta *-V-*.fasta 2>/dev/null >> database/bovine_V.fasta || true
+    # If file contains "variable" in name
+    cat *[Vv]ariable*.fasta 2>/dev/null >> database/bovine_V.fasta || true
+
+    # D genes
+    cat *IGHD*.fasta 2>/dev/null > database/bovine_D.fasta || true
+    cat *_D.fasta *_D_*.fasta *-D.fasta *-D-*.fasta 2>/dev/null >> database/bovine_D.fasta || true
+    cat *[Dd]iversity*.fasta 2>/dev/null >> database/bovine_D.fasta || true
+
+    # J genes
+    cat *IGHJ*.fasta *IGKJ*.fasta *IGLJ*.fasta 2>/dev/null > database/bovine_J.fasta || true
+    cat *_J.fasta *_J_*.fasta *-J.fasta *-J-*.fasta 2>/dev/null >> database/bovine_J.fasta || true
+    cat *[Jj]oining*.fasta 2>/dev/null >> database/bovine_J.fasta || true
+
+    # Debug: show what we created
+    echo "Database files created:" >&2
+    ls -la database/ >&2
+    echo "V file lines: \$(wc -l < database/bovine_V.fasta 2>/dev/null || echo 0)" >&2
+    echo "D file lines: \$(wc -l < database/bovine_D.fasta 2>/dev/null || echo 0)" >&2
+    echo "J file lines: \$(wc -l < database/bovine_J.fasta 2>/dev/null || echo 0)" >&2
+
+    # Build BLAST databases only if files have content
     cd database
     for f in bovine_*.fasta; do
         if [[ -s "\$f" ]]; then
+            echo "Building BLAST database for \$f" >&2
             makeblastdb -parse_seqids -dbtype nucl -in "\$f"
+        else
+            echo "Warning: \$f is empty, skipping" >&2
         fi
     done
     cd ..
