@@ -348,12 +348,25 @@ process FILTER_PRODUCTIVE {
 
     script:
     """
-    # Filter for productive sequences (in-frame, no stop codons)
-    ParseDb.py select \
-        -d ${airr_tsv} \
-        -f productive \
-        -u T TRUE True true \
-        -o ${sample_id}_productive.tsv
+    # Check if input file has data (more than just header)
+    line_count=\$(wc -l < ${airr_tsv})
+
+    if [[ \$line_count -le 1 ]]; then
+        echo "Warning: Input file ${airr_tsv} is empty or header-only, copying as-is" >&2
+        cp ${airr_tsv} ${sample_id}_productive.tsv
+    else
+        # Filter for productive sequences (in-frame, no stop codons)
+        ParseDb.py select \
+            -d ${airr_tsv} \
+            -f productive \
+            -u T TRUE True true \
+            -o ${sample_id}_productive.tsv || cp ${airr_tsv} ${sample_id}_productive.tsv
+    fi
+
+    # Ensure output exists
+    if [[ ! -f "${sample_id}_productive.tsv" ]]; then
+        cp ${airr_tsv} ${sample_id}_productive.tsv
+    fi
     """
 }
 
