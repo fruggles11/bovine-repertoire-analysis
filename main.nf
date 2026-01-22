@@ -202,10 +202,18 @@ process IGBLAST_ANNOTATION {
 
     script:
     """
-    # Run IgBLAST
+    # Set up IgBLAST directory structure
+    mkdir -p igblast_base/database
+    cp -r ${db}/* igblast_base/database/ 2>/dev/null || true
+    cp -r ${aux}/* igblast_base/ 2>/dev/null || true
+
+    # Use container's IGDATA if set, otherwise use our custom base
+    IGBLAST_BASE="\${IGDATA:-\$(pwd)/igblast_base}"
+
+    # Run IgBLAST via AssignGenes.py
     AssignGenes.py igblast \
         -s ${fasta} \
-        -b \${IGDATA} \
+        -b "\${IGBLAST_BASE}" \
         --organism bovine \
         --loci ig \
         --format blast \
