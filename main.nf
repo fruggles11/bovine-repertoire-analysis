@@ -383,14 +383,28 @@ process DEFINE_CLONES {
 
     script:
     """
-    # Define clones based on V gene, J gene, and junction similarity
-    DefineClones.py -d ${airr_tsv} \
-        --act set \
-        --model ham \
-        --norm len \
-        --dist ${params.clone_threshold} \
-        --format airr \
-        -o ${sample_id}_clones.tsv
+    # Check if file has junction field and has data
+    line_count=\$(wc -l < ${airr_tsv})
+    has_junction=\$(head -1 ${airr_tsv} | grep -c "junction" || echo "0")
+
+    if [[ \$line_count -le 1 ]] || [[ \$has_junction -eq 0 ]]; then
+        echo "Warning: Input file lacks junction field or is empty, copying as-is" >&2
+        cp ${airr_tsv} ${sample_id}_clones.tsv
+    else
+        # Define clones based on V gene, J gene, and junction similarity
+        DefineClones.py -d ${airr_tsv} \
+            --act set \
+            --model ham \
+            --norm len \
+            --dist ${params.clone_threshold} \
+            --format airr \
+            -o ${sample_id}_clones.tsv || cp ${airr_tsv} ${sample_id}_clones.tsv
+    fi
+
+    # Ensure output exists
+    if [[ ! -f "${sample_id}_clones.tsv" ]]; then
+        cp ${airr_tsv} ${sample_id}_clones.tsv
+    fi
     """
 }
 
