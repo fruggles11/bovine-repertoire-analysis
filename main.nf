@@ -157,26 +157,28 @@ process BUILD_IGBLAST_DB {
 
     # Debug: show what germline files we received
     echo "Germline files received:" >&2
-    ls -la *.fasta 2>/dev/null >&2 || echo "No .fasta files found" >&2
+    ls -la >&2
 
     # Separate V, D, J genes based on filename patterns
-    # Try multiple naming conventions (IMGT uses IGHV, some use just V, etc.)
+    # Handle filenames with spaces by using find and proper quoting
 
-    # V genes
-    cat *IGHV*.fasta *IGKV*.fasta *IGLV*.fasta 2>/dev/null > database/bovine_V.fasta || true
-    cat *_V.fasta *_V_*.fasta *-V.fasta *-V-*.fasta 2>/dev/null >> database/bovine_V.fasta || true
-    # If file contains "variable" in name
-    cat *[Vv]ariable*.fasta 2>/dev/null >> database/bovine_V.fasta || true
+    # V genes (IGHV, IGKV, IGLV)
+    find . -maxdepth 1 -name "*IGHV*" -o -name "*IGKV*" -o -name "*IGLV*" | while read f; do
+        cat "\$f" >> database/bovine_V.fasta 2>/dev/null
+    done
 
-    # D genes
-    cat *IGHD*.fasta 2>/dev/null > database/bovine_D.fasta || true
-    cat *_D.fasta *_D_*.fasta *-D.fasta *-D-*.fasta 2>/dev/null >> database/bovine_D.fasta || true
-    cat *[Dd]iversity*.fasta 2>/dev/null >> database/bovine_D.fasta || true
+    # D genes (IGHD only - light chains don't have D)
+    find . -maxdepth 1 -name "*IGHD*" | while read f; do
+        cat "\$f" >> database/bovine_D.fasta 2>/dev/null
+    done
 
-    # J genes
-    cat *IGHJ*.fasta *IGKJ*.fasta *IGLJ*.fasta 2>/dev/null > database/bovine_J.fasta || true
-    cat *_J.fasta *_J_*.fasta *-J.fasta *-J-*.fasta 2>/dev/null >> database/bovine_J.fasta || true
-    cat *[Jj]oining*.fasta 2>/dev/null >> database/bovine_J.fasta || true
+    # J genes (IGHJ, IGKJ, IGLJ)
+    find . -maxdepth 1 -name "*IGHJ*" -o -name "*IGKJ*" -o -name "*IGLJ*" | while read f; do
+        cat "\$f" >> database/bovine_J.fasta 2>/dev/null
+    done
+
+    # Ensure files exist (even if empty)
+    touch database/bovine_V.fasta database/bovine_D.fasta database/bovine_J.fasta
 
     # Debug: show what we created
     echo "Database files created:" >&2
