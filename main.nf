@@ -501,7 +501,7 @@ process GENERATE_REPORT {
 </head>
 <body>
     <h1>Bovine IgG Repertoire Analysis Report</h1>
-    <p>Generated: $(date)</p>
+    <p>Generated: \$(date)</p>
 
     <div class="section">
         <h2>Summary Statistics</h2>
