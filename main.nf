@@ -264,15 +264,16 @@ process IGBLAST_ANNOTATION {
     # Run IgBLAST directly (AssignGenes.py doesn't support bovine)
     # Use -organism human for internal_data validation (required by IgBLAST)
     # The actual annotation uses our bovine databases via -germline_db_* flags
+    # Note: BLAST db names include .fasta because makeblastdb was run on .fasta files
     igblastn \
         -query ${fasta} \
         -out ${sample_id}_igblast.fmt7 \
         -num_threads ${task.cpus} \
         -ig_seqtype Ig \
         -organism human \
-        -germline_db_V "\${IGDATA}/database/bovine_V" \
-        -germline_db_D "\${IGDATA}/database/bovine_D" \
-        -germline_db_J "\${IGDATA}/database/bovine_J" \
+        -germline_db_V "\${IGDATA}/database/bovine_V.fasta" \
+        -germline_db_D "\${IGDATA}/database/bovine_D.fasta" \
+        -germline_db_J "\${IGDATA}/database/bovine_J.fasta" \
         -outfmt "7 std qseq sseq btop" \
         -domain_system imgt
     """
