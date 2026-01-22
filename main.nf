@@ -293,22 +293,45 @@ process MAKEDB {
 
     script:
     """
-    # Combine germline references
-    cat *IGHV*.fasta *IGKV*.fasta *IGLV*.fasta 2>/dev/null > combined_V.fasta || true
-    cat *IGHD*.fasta 2>/dev/null > combined_D.fasta || true
-    cat *IGHJ*.fasta *IGKJ*.fasta *IGLJ*.fasta 2>/dev/null > combined_J.fasta || true
+    # Combine germline references using find to handle spaces in filenames
+    find . -maxdepth 1 -name "*IGHV*" -o -name "*IGKV*" -o -name "*IGLV*" | while read f; do
+        cat "\$f" >> combined_V.fasta 2>/dev/null
+    done
+    find . -maxdepth 1 -name "*IGHD*" | while read f; do
+        cat "\$f" >> combined_D.fasta 2>/dev/null
+    done
+    find . -maxdepth 1 -name "*IGHJ*" -o -name "*IGKJ*" -o -name "*IGLJ*" | while read f; do
+        cat "\$f" >> combined_J.fasta 2>/dev/null
+    done
+
+    # Ensure files exist
+    touch combined_V.fasta combined_D.fasta combined_J.fasta
+
+    # Debug: show germline file sizes
+    echo "Germline files for MakeDb:" >&2
+    ls -la combined_*.fasta >&2
 
     # Convert IgBLAST output to AIRR format
+    # Use --partial to allow sequences without complete V(D)J
     MakeDb.py igblast \
         -i ${igblast_out} \
         -s ${fasta} \
         -r combined_V.fasta combined_D.fasta combined_J.fasta \
         --extended \
+        --partial \
         --format airr \
         -o ${sample_id}_db.tsv
 
-    # Rename output
-    mv ${sample_id}_db_db-pass.tsv ${sample_id}_db-pass.tsv 2>/dev/null || mv ${sample_id}_db-pass.tsv ${sample_id}_db-pass.tsv
+    # Rename output (handle both naming conventions)
+    if [[ -f "${sample_id}_db_db-pass.tsv" ]]; then
+        mv ${sample_id}_db_db-pass.tsv ${sample_id}_db-pass.tsv
+    fi
+
+    # If no pass file was created, create empty one to not fail pipeline
+    if [[ ! -f "${sample_id}_db-pass.tsv" ]]; then
+        echo "Warning: No sequences passed MakeDb, creating empty file" >&2
+        echo -e "sequence_id\\tv_call\\td_call\\tj_call\\tsequence\\tproductive" > ${sample_id}_db-pass.tsv
+    fi
     """
 }
 
