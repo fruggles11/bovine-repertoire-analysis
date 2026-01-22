@@ -204,35 +204,42 @@ process IGBLAST_ANNOTATION {
     """
     # Set up IgBLAST directory structure that mirrors IGDATA layout
     mkdir -p igblast_data/database
-    mkdir -p igblast_data/internal_data/bovine
+    mkdir -p igblast_data/internal_data/human
     mkdir -p igblast_data/optional_file
 
-    # Copy database files
+    # Copy database files - IgBLAST will look for these by the names we specify
     cp ${db}/* igblast_data/database/ 2>/dev/null || true
 
-    # Copy any existing internal_data
-    cp -r ${aux}/* igblast_data/internal_data/ 2>/dev/null || true
-
-    # Create bovine auxiliary file (required by IgBLAST)
-    cat > igblast_data/internal_data/bovine/bovine_gl.aux << 'AUXFILE'
-# Bovine IG germline auxiliary data
-# This file contains frame information for bovine immunoglobulin genes
-# Format: gene_name\tframe_offset
+    # IgBLAST always looks for human internal_data even with custom databases
+    # Create human_gl.aux file (can be minimal/empty for custom databases)
+    cat > igblast_data/internal_data/human/human_gl.aux << 'AUXFILE'
+# Auxiliary data for IgBLAST
+# Using bovine germline databases
 AUXFILE
+
+    # Also create bovine directory for completeness
+    mkdir -p igblast_data/internal_data/bovine
+    cp igblast_data/internal_data/human/human_gl.aux igblast_data/internal_data/bovine/bovine_gl.aux
+
+    # Copy any existing internal_data from container
+    cp -r ${aux}/* igblast_data/internal_data/ 2>/dev/null || true
 
     # Set IGDATA to our custom directory
     export IGDATA="\$(pwd)/igblast_data"
 
     # Run IgBLAST directly (AssignGenes.py doesn't support bovine)
+    # Use -organism human since IgBLAST requires a supported organism for internal_data lookup
+    # The actual annotation uses our bovine databases specified with -germline_db_*
     igblastn \
         -query ${fasta} \
         -out ${sample_id}_igblast.fmt7 \
         -num_threads ${task.cpus} \
         -ig_seqtype Ig \
+        -organism human \
         -germline_db_V "\${IGDATA}/database/bovine_V" \
         -germline_db_D "\${IGDATA}/database/bovine_D" \
         -germline_db_J "\${IGDATA}/database/bovine_J" \
-        -auxiliary_data "\${IGDATA}/internal_data/bovine/bovine_gl.aux" \
+        -auxiliary_data "\${IGDATA}/internal_data/human/human_gl.aux" \
         -outfmt "7 std qseq sseq btop" \
         -domain_system imgt
     """
