@@ -205,8 +205,15 @@ process IGBLAST_ANNOTATION {
     # Set up IgBLAST directory structure
     mkdir -p igblast_data/database
 
-    # Copy our bovine database files
-    cp ${db}/* igblast_data/database/ 2>/dev/null || true
+    # Copy our bovine database files (FASTA and BLAST index files)
+    # The db variable contains all files from BUILD_IGBLAST_DB output
+    for f in ${db}; do
+        cp "\$f" igblast_data/database/
+    done
+
+    # Debug: list what we copied
+    echo "Database files copied:" >&2
+    ls -la igblast_data/database/ >&2
 
     # Copy entire internal_data from container's IGDATA (includes human databases IgBLAST needs)
     if [[ -n "\${IGDATA:-}" ]] && [[ -d "\${IGDATA}/internal_data" ]]; then
