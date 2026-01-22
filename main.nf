@@ -211,10 +211,13 @@ process IGBLAST_ANNOTATION {
     IGBLAST_BASE="\${IGDATA:-\$(pwd)/igblast_base}"
 
     # Run IgBLAST via AssignGenes.py
+    # Note: AssignGenes.py doesn't support bovine as an organism, so we specify databases directly
     AssignGenes.py igblast \
         -s ${fasta} \
         -b "\${IGBLAST_BASE}" \
-        --organism bovine \
+        --vdb igblast_base/database/bovine_V \
+        --ddb igblast_base/database/bovine_D \
+        --jdb igblast_base/database/bovine_J \
         --loci ig \
         --format blast \
         -o ${sample_id}_igblast.fmt7 \
