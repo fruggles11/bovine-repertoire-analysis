@@ -202,31 +202,37 @@ process IGBLAST_ANNOTATION {
 
     script:
     """
-    # Set up IgBLAST directory structure
-    mkdir -p igblast_db
-    cp ${db}/* igblast_db/ 2>/dev/null || true
+    # Set up IgBLAST directory structure that mirrors IGDATA layout
+    mkdir -p igblast_data/database
+    mkdir -p igblast_data/internal_data/bovine
+    mkdir -p igblast_data/optional_file
 
-    # Copy internal_data for auxiliary files
-    mkdir -p internal_data/bovine
-    cp -r ${aux}/* internal_data/ 2>/dev/null || true
+    # Copy database files
+    cp ${db}/* igblast_data/database/ 2>/dev/null || true
 
-    # Create bovine auxiliary file if it doesn't exist
-    if [[ ! -f internal_data/bovine/bovine_gl.aux ]]; then
-        # Create a minimal aux file (frame info not strictly required for basic annotation)
-        echo "# Bovine germline auxiliary data" > internal_data/bovine/bovine_gl.aux
-    fi
+    # Copy any existing internal_data
+    cp -r ${aux}/* igblast_data/internal_data/ 2>/dev/null || true
+
+    # Create bovine auxiliary file (required by IgBLAST)
+    cat > igblast_data/internal_data/bovine/bovine_gl.aux << 'AUXFILE'
+# Bovine IG germline auxiliary data
+# This file contains frame information for bovine immunoglobulin genes
+# Format: gene_name\tframe_offset
+AUXFILE
+
+    # Set IGDATA to our custom directory
+    export IGDATA="\$(pwd)/igblast_data"
 
     # Run IgBLAST directly (AssignGenes.py doesn't support bovine)
-    # Using AIRR format output for compatibility with MakeDb.py
     igblastn \
         -query ${fasta} \
         -out ${sample_id}_igblast.fmt7 \
         -num_threads ${task.cpus} \
         -ig_seqtype Ig \
-        -germline_db_V igblast_db/bovine_V \
-        -germline_db_D igblast_db/bovine_D \
-        -germline_db_J igblast_db/bovine_J \
-        -auxiliary_data internal_data/bovine/bovine_gl.aux \
+        -germline_db_V "\${IGDATA}/database/bovine_V" \
+        -germline_db_D "\${IGDATA}/database/bovine_D" \
+        -germline_db_J "\${IGDATA}/database/bovine_J" \
+        -auxiliary_data "\${IGDATA}/internal_data/bovine/bovine_gl.aux" \
         -outfmt "7 std qseq sseq btop" \
         -domain_system imgt
     """
