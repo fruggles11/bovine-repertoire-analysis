@@ -22,15 +22,19 @@ Analyzes antibody repertoire diversity from bovine IgG sequences using the [Immc
 ## Quick Start
 
 ```bash
-# From the bovine-igg-pipeline results directory
+# 1. Download bovine germlines from IMGT (see Germline Database section below)
+#    Save FASTA files to a germlines/ directory
+
+# 2. From the bovine-igg-pipeline results directory
 cd /path/to/results/4_consensus_sequences
 
-# Collect all unique FASTA files
+# 3. Collect all unique FASTA files
 rm -rf analysis_input && mkdir -p analysis_input && find . -path ./analysis_input -prune -o -name "*_unique.fasta" -exec cp {} ./analysis_input/ \;
 
-# Run the pipeline
-nextflow run /path/to/repertoire-analysis \
-    --fasta_input "analysis_input/*_unique.fasta" \
+# 4. Run the pipeline (germline_db is required for bovine)
+nextflow run fruggles11/bovine-repertoire-analysis \
+    --germline_db '/path/to/germlines/*.fasta' \
+    --fasta_input 'analysis_input/*_unique.fasta' \
     --results ./repertoire_results
 ```
 
@@ -46,7 +50,7 @@ The pipeline accepts FASTA files containing antibody sequences. These can be:
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `--fasta_input` | `*_unique.fasta` | Glob pattern for input FASTA files |
-| `--germline_db` | null | Path to pre-built germline FASTAs (optional) |
+| `--germline_db` | **required** | Path to bovine germline FASTAs (glob pattern) |
 | `--results` | `./results` | Output directory |
 | `--clone_threshold` | 0.15 | Junction distance threshold for clonotype definition |
 
@@ -75,16 +79,33 @@ results/
 └── repertoire_report.html
 ```
 
-## Germline Database
+## Germline Database (Required)
 
-The pipeline requires bovine immunoglobulin germline sequences. Options:
+The pipeline requires bovine immunoglobulin germline sequences. **Manual download is required** because Immcantation's `fetch_imgtdb.sh` does not support bovine.
 
-1. **Automatic download** (default): The pipeline will attempt to fetch bovine germlines from IMGT using Immcantation's `fetch_imgtdb.sh`
+### Download from IMGT/GENE-DB
 
-2. **Manual download**: Download from [IMGT/GENE-DB](https://www.imgt.org/genedb/):
-   - Select Species: "Bos taurus"
-   - Download IGHV, IGHD, IGHJ, IGKV, IGKJ, IGLV, IGLJ
-   - Provide path via `--germline_db /path/to/germlines/`
+1. Go to [IMGT/GENE-DB](https://www.imgt.org/genedb/)
+2. Select **Species**: "Bos taurus"
+3. Select **Molecular component**: "IG" (immunoglobulin)
+4. For each gene type, download the nucleotide sequences:
+   - **IGHV** (heavy chain variable)
+   - **IGHD** (heavy chain diversity)
+   - **IGHJ** (heavy chain joining)
+   - Optionally: IGKV, IGKJ, IGLV, IGLJ for light chains
+5. Save all FASTA files to a single directory (e.g., `germlines/`)
+6. Provide the path via `--germline_db './germlines/*.fasta'`
+
+### Example
+
+```bash
+mkdir -p germlines
+# Download FASTA files from IMGT and save to germlines/
+# Then run:
+nextflow run fruggles11/bovine-repertoire-analysis \
+    --germline_db './germlines/*.fasta' \
+    --fasta_input 'analysis_input/*_unique.fasta'
+```
 
 ## Diversity Metrics
 

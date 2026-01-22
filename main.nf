@@ -32,13 +32,29 @@ workflow {
             tuple( sample_id, fasta )
         }
 
-    // Download/prepare germline database if not provided
-    if ( params.germline_db ) {
-        ch_germline = Channel.fromPath( params.germline_db )
-    } else {
-        FETCH_GERMLINES()
-        ch_germline = FETCH_GERMLINES.out
+    // Germline database is required for bovine (not available via fetch_imgtdb.sh)
+    if ( !params.germline_db ) {
+        error """
+        =====================================================================
+        ERROR: Bovine germline database is required
+        =====================================================================
+        The Immcantation fetch_imgtdb.sh script does not support bovine.
+        You must provide germline FASTA files manually.
+
+        Download from IMGT/GENE-DB (https://www.imgt.org/genedb/):
+          1. Select Species: "Bos taurus"
+          2. Select Gene type: IGHV, IGHD, IGHJ (and IGKV, IGKJ, IGLV, IGLJ if needed)
+          3. Download nucleotide sequences in FASTA format
+          4. Save files to a directory (e.g., ./germlines/)
+
+        Then run with:
+          nextflow run fruggles11/bovine-repertoire-analysis \\
+              --germline_db './germlines/*.fasta' \\
+              --fasta_input 'analysis_input/*_unique.fasta'
+        =====================================================================
+        """.stripIndent()
     }
+    ch_germline = Channel.fromPath( params.germline_db )
 
     // Build IgBLAST database
     BUILD_IGBLAST_DB( ch_germline.collect() )
@@ -105,6 +121,8 @@ params.subsample = null  // Subsample size for diversity (null = no subsampling)
 // PROCESSES
 // --------------------------------------------------------------- //
 
+// NOTE: FETCH_GERMLINES is not used for bovine - germlines must be provided manually
+// This process is kept for potential future use with other species
 process FETCH_GERMLINES {
 
     publishDir "${params.results}/germlines", mode: 'copy'
@@ -114,16 +132,11 @@ process FETCH_GERMLINES {
 
     script:
     """
-    # Fetch bovine germlines from IMGT using Immcantation's fetch script
-    fetch_imgtdb.sh -o . -s bovine
-
-    # Rename files to standard format if needed
-    for f in *.fasta; do
-        if [[ ! -f "\$f" ]]; then
-            echo "Warning: No germline files downloaded. Please check IMGT availability."
-            exit 1
-        fi
-    done
+    # fetch_imgtdb.sh only supports: human, mouse, rat, rabbit, rhesus_monkey
+    # Bovine germlines must be downloaded manually from IMGT
+    echo "ERROR: Automatic germline fetch not supported for bovine"
+    echo "Please download from https://www.imgt.org/genedb/ and use --germline_db"
+    exit 1
     """
 }
 
