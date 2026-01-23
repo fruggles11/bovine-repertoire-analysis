@@ -351,25 +351,13 @@ process FILTER_PRODUCTIVE {
 
     script:
     """
-    # Check if input file has data (more than just header)
-    line_count=\$(wc -l < ${airr_tsv})
+    # NOTE: Productivity filtering is skipped for bovine sequences because
+    # the germline references are not IMGT-gapped, which prevents accurate
+    # productivity determination. All sequences are passed through.
+    # To enable filtering, use IMGT-gapped germline sequences.
 
-    if [[ \$line_count -le 1 ]]; then
-        echo "Warning: Input file ${airr_tsv} is empty or header-only, copying as-is" >&2
-        cp ${airr_tsv} ${sample_id}_productive.tsv
-    else
-        # Filter for productive sequences (in-frame, no stop codons)
-        ParseDb.py select \
-            -d ${airr_tsv} \
-            -f productive \
-            -u T TRUE True true \
-            -o ${sample_id}_productive.tsv || cp ${airr_tsv} ${sample_id}_productive.tsv
-    fi
-
-    # Ensure output exists
-    if [[ ! -f "${sample_id}_productive.tsv" ]]; then
-        cp ${airr_tsv} ${sample_id}_productive.tsv
-    fi
+    echo "Skipping productivity filter (germlines not IMGT-gapped)" >&2
+    cp ${airr_tsv} ${sample_id}_productive.tsv
     """
 }
 
