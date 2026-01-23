@@ -115,6 +115,7 @@ params.clone_method = "hierarchical"  // clustering method
 // Analysis parameters
 params.min_seq_count = 1  // Minimum sequences per clone
 params.subsample = null  // Subsample size for diversity (null = no subsampling)
+params.skip_productive_filter = true  // Skip productivity filtering (set to false if using IMGT-gapped germlines)
 
 
 // --------------------------------------------------------------- //
@@ -350,15 +351,35 @@ process FILTER_PRODUCTIVE {
     tuple val(sample_id), path("${sample_id}_productive.tsv")
 
     script:
-    """
-    # NOTE: Productivity filtering is skipped for bovine sequences because
-    # the germline references are not IMGT-gapped, which prevents accurate
-    # productivity determination. All sequences are passed through.
-    # To enable filtering, use IMGT-gapped germline sequences.
+    if (params.skip_productive_filter)
+        """
+        # Productivity filtering skipped (--skip_productive_filter true)
+        # Use --skip_productive_filter false with IMGT-gapped germlines
+        echo "Skipping productivity filter (germlines not IMGT-gapped)" >&2
+        cp ${airr_tsv} ${sample_id}_productive.tsv
+        """
+    else
+        """
+        # Filter for productive sequences (in-frame, no stop codons)
+        # Requires IMGT-gapped germline sequences for accurate results
+        line_count=\$(wc -l < ${airr_tsv})
 
-    echo "Skipping productivity filter (germlines not IMGT-gapped)" >&2
-    cp ${airr_tsv} ${sample_id}_productive.tsv
-    """
+        if [[ \$line_count -le 1 ]]; then
+            echo "Warning: Input file is empty or header-only, copying as-is" >&2
+            cp ${airr_tsv} ${sample_id}_productive.tsv
+        else
+            ParseDb.py select \
+                -d ${airr_tsv} \
+                -f productive \
+                -u T TRUE True true \
+                -o ${sample_id}_productive.tsv || cp ${airr_tsv} ${sample_id}_productive.tsv
+        fi
+
+        # Ensure output exists
+        if [[ ! -f "${sample_id}_productive.tsv" ]]; then
+            cp ${airr_tsv} ${sample_id}_productive.tsv
+        fi
+        """
 }
 
 process DEFINE_CLONES {
