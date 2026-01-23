@@ -322,8 +322,11 @@ process MAKEDB {
         --format airr \
         -o ${sample_id}_db.tsv
 
-    # Rename output (handle both naming conventions)
-    if [[ -f "${sample_id}_db_db-pass.tsv" ]]; then
+    # Rename output to expected filename
+    # MakeDb.py with -o sample_db.tsv outputs to sample_db.tsv (not sample_db_db-pass.tsv)
+    if [[ -f "${sample_id}_db.tsv" ]] && [[ ! -f "${sample_id}_db-pass.tsv" ]]; then
+        mv ${sample_id}_db.tsv ${sample_id}_db-pass.tsv
+    elif [[ -f "${sample_id}_db_db-pass.tsv" ]]; then
         mv ${sample_id}_db_db-pass.tsv ${sample_id}_db-pass.tsv
     fi
 
@@ -447,30 +450,42 @@ process DIVERSITY_ANALYSIS {
     })
     db <- bind_rows(db_list)
 
+    # Check if clone_id column exists
+    has_clone_id <- "clone_id" %in% colnames(db)
+    has_junction_aa <- "junction_aa" %in% colnames(db)
+
+    if (!has_clone_id) {
+        message("Warning: clone_id column not found in data. Clone-based analyses will be skipped.")
+    }
+
     # Basic stats
     stats <- db %>%
         group_by(sample_id) %>%
         summarise(
             total_sequences = n(),
-            unique_clones = n_distinct(clone_id, na.rm = TRUE),
+            unique_clones = if (has_clone_id) n_distinct(clone_id, na.rm = TRUE) else NA_integer_,
             productive = sum(productive == TRUE | productive == "T", na.rm = TRUE),
-            mean_cdr3_length = mean(nchar(as.character(junction_aa)), na.rm = TRUE),
-            median_cdr3_length = median(nchar(as.character(junction_aa)), na.rm = TRUE)
+            mean_cdr3_length = if (has_junction_aa) mean(nchar(as.character(junction_aa)), na.rm = TRUE) else NA_real_,
+            median_cdr3_length = if (has_junction_aa) median(nchar(as.character(junction_aa)), na.rm = TRUE) else NA_real_
         )
     write.csv(stats, "stats/basic_stats.csv", row.names = FALSE)
 
-    # CDR3 length distribution
-    db\$cdr3_length <- nchar(as.character(db\$junction_aa))
+    # CDR3 length distribution (only if junction_aa exists)
+    if (has_junction_aa) {
+        db\$cdr3_length <- nchar(as.character(db\$junction_aa))
 
-    p1 <- ggplot(db, aes(x = cdr3_length, fill = sample_id)) +
-        geom_histogram(binwidth = 1, position = "dodge", alpha = 0.7) +
-        labs(title = "CDR3 Length Distribution",
-             x = "CDR3 Length (amino acids)",
-             y = "Count") +
-        theme_minimal() +
-        theme(legend.position = "bottom")
-    ggsave("plots/cdr3_length_distribution.pdf", p1, width = 10, height = 6)
-    ggsave("plots/cdr3_length_distribution.png", p1, width = 10, height = 6, dpi = 150)
+        p1 <- ggplot(db, aes(x = cdr3_length, fill = sample_id)) +
+            geom_histogram(binwidth = 1, position = "dodge", alpha = 0.7) +
+            labs(title = "CDR3 Length Distribution",
+                 x = "CDR3 Length (amino acids)",
+                 y = "Count") +
+            theme_minimal() +
+            theme(legend.position = "bottom")
+        ggsave("plots/cdr3_length_distribution.pdf", p1, width = 10, height = 6)
+        ggsave("plots/cdr3_length_distribution.png", p1, width = 10, height = 6, dpi = 150)
+    } else {
+        message("Skipping CDR3 length distribution due to missing junction_aa column")
+    }
 
     # V gene usage
     v_usage <- db %>%
@@ -516,81 +531,90 @@ process DIVERSITY_ANALYSIS {
     ggsave("plots/j_gene_usage.pdf", p3, width = 10, height = 6)
     ggsave("plots/j_gene_usage.png", p3, width = 10, height = 6, dpi = 150)
 
-    # Clone size distribution
-    clone_sizes <- db %>%
-        filter(!is.na(clone_id)) %>%
-        group_by(sample_id, clone_id) %>%
-        summarise(clone_size = n(), .groups = "drop")
+    # Clone size distribution (only if clone_id exists)
+    if (has_clone_id) {
+        clone_sizes <- db %>%
+            filter(!is.na(clone_id)) %>%
+            group_by(sample_id, clone_id) %>%
+            summarise(clone_size = n(), .groups = "drop")
 
-    write.csv(clone_sizes, "stats/clone_sizes.csv", row.names = FALSE)
+        write.csv(clone_sizes, "stats/clone_sizes.csv", row.names = FALSE)
 
-    p4 <- ggplot(clone_sizes, aes(x = clone_size, fill = sample_id)) +
-        geom_histogram(binwidth = 1, position = "dodge", alpha = 0.7) +
-        scale_x_log10() +
-        labs(title = "Clone Size Distribution",
-             x = "Clone Size (log10)",
-             y = "Count") +
-        theme_minimal() +
-        theme(legend.position = "bottom")
-    ggsave("plots/clone_size_distribution.pdf", p4, width = 10, height = 6)
-    ggsave("plots/clone_size_distribution.png", p4, width = 10, height = 6, dpi = 150)
-
-    # Diversity curves using Alakazam
-    if (nrow(db) > 0 && any(!is.na(db\$clone_id))) {
-
-        # Calculate diversity
-        div_curve <- tryCatch({
-            alphaDiversity(db, group = "sample_id", clone = "clone_id",
-                          min_q = 0, max_q = 4, step_q = 0.1,
-                          ci = 0.95, nboot = 100)
-        }, error = function(e) {
-            message("Could not calculate diversity curve: ", e\$message)
-            NULL
-        })
-
-        if (!is.null(div_curve)) {
-            p5 <- plot(div_curve, legend_title = "Sample") +
-                labs(title = "Repertoire Diversity (Hill Numbers)") +
-                theme_minimal()
-            ggsave("plots/diversity_curve.pdf", p5, width = 10, height = 6)
-            ggsave("plots/diversity_curve.png", p5, width = 10, height = 6, dpi = 150)
-
-            # Save diversity values
-            write.csv(div_curve@diversity, "stats/diversity_values.csv", row.names = FALSE)
+        if (nrow(clone_sizes) > 0) {
+            p4 <- ggplot(clone_sizes, aes(x = clone_size, fill = sample_id)) +
+                geom_histogram(binwidth = 1, position = "dodge", alpha = 0.7) +
+                scale_x_log10() +
+                labs(title = "Clone Size Distribution",
+                     x = "Clone Size (log10)",
+                     y = "Count") +
+                theme_minimal() +
+                theme(legend.position = "bottom")
+            ggsave("plots/clone_size_distribution.pdf", p4, width = 10, height = 6)
+            ggsave("plots/clone_size_distribution.png", p4, width = 10, height = 6, dpi = 150)
         }
 
-        # Rarefaction curve
-        rarefaction <- tryCatch({
-            estimateAbundance(db, group = "sample_id", clone = "clone_id",
-                            ci = 0.95, nboot = 100)
-        }, error = function(e) {
-            message("Could not calculate rarefaction: ", e\$message)
-            NULL
-        })
+        # Diversity curves using Alakazam
+        if (nrow(db) > 0 && any(!is.na(db\$clone_id))) {
 
-        if (!is.null(rarefaction)) {
-            p6 <- plot(rarefaction, legend_title = "Sample") +
-                labs(title = "Clonal Abundance Rarefaction") +
-                theme_minimal()
-            ggsave("plots/rarefaction_curve.pdf", p6, width = 10, height = 6)
-            ggsave("plots/rarefaction_curve.png", p6, width = 10, height = 6, dpi = 150)
+            # Calculate diversity
+            div_curve <- tryCatch({
+                alphaDiversity(db, group = "sample_id", clone = "clone_id",
+                              min_q = 0, max_q = 4, step_q = 0.1,
+                              ci = 0.95, nboot = 100)
+            }, error = function(e) {
+                message("Could not calculate diversity curve: ", e\$message)
+                NULL
+            })
+
+            if (!is.null(div_curve)) {
+                p5 <- plot(div_curve, legend_title = "Sample") +
+                    labs(title = "Repertoire Diversity (Hill Numbers)") +
+                    theme_minimal()
+                ggsave("plots/diversity_curve.pdf", p5, width = 10, height = 6)
+                ggsave("plots/diversity_curve.png", p5, width = 10, height = 6, dpi = 150)
+
+                # Save diversity values
+                write.csv(div_curve@diversity, "stats/diversity_values.csv", row.names = FALSE)
+            }
+
+            # Rarefaction curve
+            rarefaction <- tryCatch({
+                estimateAbundance(db, group = "sample_id", clone = "clone_id",
+                                ci = 0.95, nboot = 100)
+            }, error = function(e) {
+                message("Could not calculate rarefaction: ", e\$message)
+                NULL
+            })
+
+            if (!is.null(rarefaction)) {
+                p6 <- plot(rarefaction, legend_title = "Sample") +
+                    labs(title = "Clonal Abundance Rarefaction") +
+                    theme_minimal()
+                ggsave("plots/rarefaction_curve.pdf", p6, width = 10, height = 6)
+                ggsave("plots/rarefaction_curve.png", p6, width = 10, height = 6, dpi = 150)
+            }
         }
+
+        # Summary diversity metrics
+        diversity_summary <- db %>%
+            filter(!is.na(clone_id)) %>%
+            group_by(sample_id) %>%
+            summarise(
+                total_sequences = n(),
+                unique_clones = n_distinct(clone_id),
+                simpson_index = 1 - sum((table(clone_id)/n())^2),
+                shannon_index = -sum((table(clone_id)/n()) * log(table(clone_id)/n())),
+                chao1 = n_distinct(clone_id) + (sum(table(clone_id) == 1)^2) / (2 * max(1, sum(table(clone_id) == 2))),
+                .groups = "drop"
+            )
+
+        write.csv(diversity_summary, "stats/diversity_summary.csv", row.names = FALSE)
+    } else {
+        message("Skipping clone-based analyses due to missing clone_id column")
+        # Create empty placeholder files
+        write.csv(data.frame(), "stats/clone_sizes.csv", row.names = FALSE)
+        write.csv(data.frame(), "stats/diversity_summary.csv", row.names = FALSE)
     }
-
-    # Summary diversity metrics
-    diversity_summary <- db %>%
-        filter(!is.na(clone_id)) %>%
-        group_by(sample_id) %>%
-        summarise(
-            total_sequences = n(),
-            unique_clones = n_distinct(clone_id),
-            simpson_index = 1 - sum((table(clone_id)/n())^2),
-            shannon_index = -sum((table(clone_id)/n()) * log(table(clone_id)/n())),
-            chao1 = n_distinct(clone_id) + (sum(table(clone_id) == 1)^2) / (2 * max(1, sum(table(clone_id) == 2))),
-            .groups = "drop"
-        )
-
-    write.csv(diversity_summary, "stats/diversity_summary.csv", row.names = FALSE)
 
     message("Diversity analysis complete!")
 
