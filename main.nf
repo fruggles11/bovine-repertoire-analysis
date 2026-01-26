@@ -458,7 +458,13 @@ process DIVERSITY_ANALYSIS {
     # Combine all data
     db_list <- lapply(files, function(f) {
         df <- read_rearrangement(f)
-        df\$sample_id <- gsub("_clones.tsv", "", basename(f))
+        # Get base sample name, removing _clones.tsv suffix
+        sample_name <- gsub("_clones.tsv", "", basename(f))
+        # Remove _0, _1, _2, etc. and _nogroup suffixes to combine related samples
+        # e.g., barcode96_heavy_0, barcode96_heavy_1 -> barcode96_heavy
+        sample_name <- gsub("_[0-9]+\$", "", sample_name)
+        sample_name <- gsub("_nogroup\$", "", sample_name)
+        df\$sample_id <- sample_name
         return(df)
     })
     db <- bind_rows(db_list)
