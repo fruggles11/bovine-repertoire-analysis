@@ -117,6 +117,12 @@ params.min_seq_count = 1  // Minimum sequences per clone
 params.subsample = null  // Subsample size for diversity (null = no subsampling)
 params.skip_productive_filter = true  // Productivity detection not working reliably for bovine - skipping filter
 
+// Barcode/chain assignment for filtering cross-contamination
+// Specify which barcodes contain only light or heavy chains
+// Any other chain type found in these barcodes will be filtered out as contamination
+params.light_chain_barcodes = "barcode88"  // Comma-separated list of barcodes that are light chain only
+params.heavy_chain_barcodes = "barcode96"  // Comma-separated list of barcodes that are heavy chain only
+
 
 // --------------------------------------------------------------- //
 // PROCESSES
@@ -470,11 +476,23 @@ process DIVERSITY_ANALYSIS {
     db <- bind_rows(db_list)
 
     # Filter out cross-contamination based on expected barcode/chain combinations
-    # barcode88 = light chain only (heavy is contamination)
-    # barcode96 = heavy chain only (light is contamination)
-    contamination <- c("barcode88_heavy", "barcode96_light")
-    db <- db %>% filter(!sample_id %in% contamination)
-    message("Filtered out contamination samples: ", paste(contamination, collapse = ", "))
+    # Light chain barcodes should not have heavy chain data (and vice versa)
+    light_barcodes <- strsplit("${params.light_chain_barcodes}", ",")[[1]]
+    light_barcodes <- trimws(light_barcodes)
+    heavy_barcodes <- strsplit("${params.heavy_chain_barcodes}", ",")[[1]]
+    heavy_barcodes <- trimws(heavy_barcodes)
+
+    # Build contamination list: light barcodes + _heavy, heavy barcodes + _light
+    contamination <- c(
+        paste0(light_barcodes, "_heavy"),
+        paste0(heavy_barcodes, "_light")
+    )
+    contamination <- contamination[contamination != "_heavy" & contamination != "_light"]  # Remove empty entries
+
+    if (length(contamination) > 0) {
+        db <- db %>% filter(!sample_id %in% contamination)
+        message("Filtered out contamination samples: ", paste(contamination, collapse = ", "))
+    }
     message("Remaining samples: ", paste(unique(db\$sample_id), collapse = ", "))
 
     # Check if clone_id column exists
