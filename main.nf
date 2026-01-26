@@ -115,7 +115,7 @@ params.clone_method = "hierarchical"  // clustering method
 // Analysis parameters
 params.min_seq_count = 1  // Minimum sequences per clone
 params.subsample = null  // Subsample size for diversity (null = no subsampling)
-params.skip_productive_filter = false  // Set to true only if using ungapped germlines
+params.skip_productive_filter = true  // Productivity detection not working reliably for bovine - skipping filter
 
 
 // --------------------------------------------------------------- //
