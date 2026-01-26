@@ -316,12 +316,14 @@ process MAKEDB {
 
     # Convert IgBLAST output to AIRR format
     # Use --partial to allow sequences without complete V(D)J
+    # Use --infer-junction to extract junction/CDR3 from alignments (needed for bovine)
     MakeDb.py igblast \
         -i ${igblast_out} \
         -s ${fasta} \
         -r combined_V.fasta combined_D.fasta combined_J.fasta \
         --extended \
         --partial \
+        --infer-junction \
         --format airr \
         -o ${sample_id}_db.tsv
 
