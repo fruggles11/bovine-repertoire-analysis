@@ -53,6 +53,24 @@ The pipeline accepts FASTA files containing antibody sequences. These can be:
 | `--germline_db` | **required** | Path to bovine germline FASTAs (glob pattern) |
 | `--results` | `./results` | Output directory |
 | `--clone_threshold` | 0.15 | Junction distance threshold for clonotype definition |
+| `--light_chain_barcodes` | `barcode88` | Comma-separated barcodes containing only light chain |
+| `--heavy_chain_barcodes` | `barcode96` | Comma-separated barcodes containing only heavy chain |
+
+### Barcode/Chain Filtering
+
+If your library prep assigns specific barcodes to specific chain types, use these parameters to filter out cross-contamination. Any heavy chain data found in light-chain-only barcodes (and vice versa) will be excluded from analysis.
+
+```bash
+# Example: barcode01 and barcode02 are light chain, barcode03 is heavy chain
+nextflow run fruggles11/bovine-repertoire-analysis \
+    --germline_db './germlines/*.fasta' \
+    --fasta_input 'analysis_input/*_unique.fasta' \
+    --light_chain_barcodes "barcode01,barcode02" \
+    --heavy_chain_barcodes "barcode03"
+
+# To disable filtering (if barcodes have mixed chains):
+--light_chain_barcodes "" --heavy_chain_barcodes ""
+```
 
 ## Output
 
@@ -83,24 +101,44 @@ results/
 
 The pipeline requires bovine immunoglobulin germline sequences. **Manual download is required** because Immcantation's `fetch_imgtdb.sh` does not support bovine.
 
+> **⚠️ IMPORTANT: You must download IMGT-gapped sequences.** Ungapped sequences will not work correctly - CDR3/junction regions will not be identified and all downstream analysis will fail.
+
 ### Download from IMGT/GENE-DB
 
 1. Go to [IMGT/GENE-DB](https://www.imgt.org/genedb/)
 2. Select **Species**: "Bos taurus"
 3. Select **Molecular component**: "IG" (immunoglobulin)
-4. For each gene type, download the nucleotide sequences:
-   - **IGHV** (heavy chain variable)
-   - **IGHD** (heavy chain diversity)
-   - **IGHJ** (heavy chain joining)
-   - Optionally: IGKV, IGKJ, IGLV, IGLJ for light chains
-5. Save all FASTA files to a single directory (e.g., `germlines/`)
-6. Provide the path via `--germline_db './germlines/*.fasta'`
+4. Select **Functionality**: "F" (functional) or leave as default
+5. **CRITICAL**: Check the box for **"With IMGT gaps"** before downloading
+6. For each gene type, click "FASTA" to download:
+
+   **Heavy chain (required):**
+   - **IGHV** - Variable genes
+   - **IGHD** - Diversity genes
+   - **IGHJ** - Joining genes
+
+   **Light chain (if analyzing light chains):**
+   - **IGKV**, **IGKJ** - Kappa chain
+   - **IGLV**, **IGLJ** - Lambda chain
+
+7. Save all FASTA files to a single directory (e.g., `germlines/`)
+8. Provide the path via `--germline_db './germlines/*.fasta'`
+
+### Why IMGT-gapped sequences?
+
+IMGT gaps are standardized insertions (shown as dots `.` in the sequence) that maintain consistent numbering across all immunoglobulin sequences. These gaps are required for:
+- Proper CDR3/junction identification
+- Accurate V(D)J boundary detection
+- Correct reading frame determination
+
+Without gaps, the pipeline will run but produce empty CDR3 data and incorrect diversity metrics.
 
 ### Example
 
 ```bash
 mkdir -p germlines
-# Download FASTA files from IMGT and save to germlines/
+# Download IMGT-gapped FASTA files and save to germlines/
+# Files should look like: Bos_taurus_IGHV_gapped.fasta, etc.
 # Then run:
 nextflow run fruggles11/bovine-repertoire-analysis \
     --germline_db './germlines/*.fasta' \
