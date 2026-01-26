@@ -469,6 +469,14 @@ process DIVERSITY_ANALYSIS {
     })
     db <- bind_rows(db_list)
 
+    # Filter out cross-contamination based on expected barcode/chain combinations
+    # barcode88 = light chain only (heavy is contamination)
+    # barcode96 = heavy chain only (light is contamination)
+    contamination <- c("barcode88_heavy", "barcode96_light")
+    db <- db %>% filter(!sample_id %in% contamination)
+    message("Filtered out contamination samples: ", paste(contamination, collapse = ", "))
+    message("Remaining samples: ", paste(unique(db\$sample_id), collapse = ", "))
+
     # Check if clone_id column exists
     has_clone_id <- "clone_id" %in% colnames(db)
     has_junction_aa <- "junction_aa" %in% colnames(db)
