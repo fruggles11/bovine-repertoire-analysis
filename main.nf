@@ -162,19 +162,20 @@ process BUILD_IGBLAST_DB {
 
     # Separate V, D, J genes based on filename patterns
     # Handle filenames with spaces by using find and proper quoting
+    # Use -iname for case-insensitive matching (handles IGHV, IgHV, ighv, etc.)
 
     # V genes (IGHV, IGKV, IGLV)
-    find . -maxdepth 1 -name "*IGHV*" -o -name "*IGKV*" -o -name "*IGLV*" | while read f; do
+    find . -maxdepth 1 -iname "*IGHV*" -o -iname "*IGKV*" -o -iname "*IGLV*" -o -iname "*IgHV*" -o -iname "*IgKV*" -o -iname "*IgLV*" | while read f; do
         cat "\$f" >> database/bovine_V.fasta 2>/dev/null
     done
 
     # D genes (IGHD only - light chains don't have D)
-    find . -maxdepth 1 -name "*IGHD*" | while read f; do
+    find . -maxdepth 1 -iname "*IGHD*" -o -iname "*IgHD*" | while read f; do
         cat "\$f" >> database/bovine_D.fasta 2>/dev/null
     done
 
     # J genes (IGHJ, IGKJ, IGLJ)
-    find . -maxdepth 1 -name "*IGHJ*" -o -name "*IGKJ*" -o -name "*IGLJ*" | while read f; do
+    find . -maxdepth 1 -iname "*IGHJ*" -o -iname "*IGKJ*" -o -iname "*IGLJ*" -o -iname "*IgHJ*" -o -iname "*IgKJ*" -o -iname "*IgLJ*" | while read f; do
         cat "\$f" >> database/bovine_J.fasta 2>/dev/null
     done
 
@@ -295,13 +296,14 @@ process MAKEDB {
     script:
     """
     # Combine germline references using find to handle spaces in filenames
-    find . -maxdepth 1 -name "*IGHV*" -o -name "*IGKV*" -o -name "*IGLV*" | while read f; do
+    # Use -iname for case-insensitive matching (handles IGHV, IgHV, ighv, etc.)
+    find . -maxdepth 1 -iname "*IGHV*" -o -iname "*IGKV*" -o -iname "*IGLV*" -o -iname "*IgHV*" -o -iname "*IgKV*" -o -iname "*IgLV*" | while read f; do
         cat "\$f" >> combined_V.fasta 2>/dev/null
     done
-    find . -maxdepth 1 -name "*IGHD*" | while read f; do
+    find . -maxdepth 1 -iname "*IGHD*" -o -iname "*IgHD*" | while read f; do
         cat "\$f" >> combined_D.fasta 2>/dev/null
     done
-    find . -maxdepth 1 -name "*IGHJ*" -o -name "*IGKJ*" -o -name "*IGLJ*" | while read f; do
+    find . -maxdepth 1 -iname "*IGHJ*" -o -iname "*IGKJ*" -o -iname "*IGLJ*" -o -iname "*IgHJ*" -o -iname "*IgKJ*" -o -iname "*IgLJ*" | while read f; do
         cat "\$f" >> combined_J.fasta 2>/dev/null
     done
 
