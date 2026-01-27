@@ -571,8 +571,9 @@ process DIVERSITY_ANALYSIS {
     ggsave("plots/v_gene_usage.pdf", p2, width = 14, height = 6)
     ggsave("plots/v_gene_usage.png", p2, width = 14, height = 6, dpi = 150)
 
-    # D gene usage (heavy chain only)
+    # D gene usage (heavy chain only - light chains don't have D segments)
     d_usage <- db %>%
+        filter(grepl("_heavy\$", sample_id)) %>%  # Only heavy chain samples
         filter(!is.na(d_call) & d_call != "") %>%
         mutate(d_gene = gsub("\\\\*.*", "", d_call)) %>%
         group_by(sample_id, d_gene) %>%
