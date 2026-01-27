@@ -53,24 +53,16 @@ The pipeline accepts FASTA files containing antibody sequences. These can be:
 | `--germline_db` | **required** | Path to bovine germline FASTAs (glob pattern) |
 | `--results` | `./results` | Output directory |
 | `--clone_threshold` | 0.15 | Junction distance threshold for clonotype definition |
-| `--light_chain_barcodes` | `barcode88` | Comma-separated barcodes containing only light chain |
-| `--heavy_chain_barcodes` | `barcode96` | Comma-separated barcodes containing only heavy chain |
 
-### Barcode/Chain Filtering
+### Automatic Chain Filtering
 
-If your library prep assigns specific barcodes to specific chain types, use these parameters to filter out cross-contamination. Any heavy chain data found in light-chain-only barcodes (and vice versa) will be excluded from analysis.
+The pipeline automatically detects the dominant chain type (heavy or light) for each barcode by counting sequences. The minority chain type is filtered out as cross-contamination.
 
-```bash
-# Example: barcode01 and barcode02 are light chain, barcode03 is heavy chain
-nextflow run fruggles11/bovine-repertoire-analysis \
-    --germline_db './germlines/*.fasta' \
-    --fasta_input 'analysis_input/*_unique.fasta' \
-    --light_chain_barcodes "barcode01,barcode02" \
-    --heavy_chain_barcodes "barcode03"
+For example, if barcode88 has 15,000 light chain sequences and 500 heavy chain sequences, the pipeline will:
+- Keep: `barcode88_light` (dominant)
+- Filter out: `barcode88_heavy` (contamination)
 
-# To disable filtering (if barcodes have mixed chains):
---light_chain_barcodes "" --heavy_chain_barcodes ""
-```
+This works automatically with any number of barcodes - no manual configuration needed.
 
 ## Output
 

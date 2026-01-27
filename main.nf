@@ -117,11 +117,9 @@ params.min_seq_count = 1  // Minimum sequences per clone
 params.subsample = null  // Subsample size for diversity (null = no subsampling)
 params.skip_productive_filter = true  // Productivity detection not working reliably for bovine - skipping filter
 
-// Barcode/chain assignment for filtering cross-contamination
-// Specify which barcodes contain only light or heavy chains
-// Any other chain type found in these barcodes will be filtered out as contamination
-params.light_chain_barcodes = "barcode88"  // Comma-separated list of barcodes that are light chain only
-params.heavy_chain_barcodes = "barcode96"  // Comma-separated list of barcodes that are heavy chain only
+// Cross-contamination filtering
+// The pipeline auto-detects the dominant chain type for each barcode
+// and filters out minority chain types as contamination
 
 
 // --------------------------------------------------------------- //
@@ -475,25 +473,44 @@ process DIVERSITY_ANALYSIS {
     })
     db <- bind_rows(db_list)
 
-    # Filter out cross-contamination based on expected barcode/chain combinations
-    # Light chain barcodes should not have heavy chain data (and vice versa)
-    light_barcodes <- strsplit("${params.light_chain_barcodes}", ",")[[1]]
-    light_barcodes <- trimws(light_barcodes)
-    heavy_barcodes <- strsplit("${params.heavy_chain_barcodes}", ",")[[1]]
-    heavy_barcodes <- trimws(heavy_barcodes)
+    # Auto-detect dominant chain type per barcode and filter contamination
+    # For each barcode, keep only the chain type with more sequences (majority)
 
-    # Build contamination list: light barcodes + _heavy, heavy barcodes + _light
-    contamination <- c(
-        paste0(light_barcodes, "_heavy"),
-        paste0(heavy_barcodes, "_light")
-    )
-    contamination <- contamination[contamination != "_heavy" & contamination != "_light"]  # Remove empty entries
+    # Extract barcode and chain type from sample_id (e.g., "barcode88_heavy" -> "barcode88", "heavy")
+    db <- db %>%
+        mutate(
+            barcode = gsub("_(heavy|light)\$", "", sample_id),
+            chain_type = ifelse(grepl("_heavy\$", sample_id), "heavy",
+                         ifelse(grepl("_light\$", sample_id), "light", "unknown"))
+        )
 
+    # Count sequences per barcode and chain type
+    chain_counts <- db %>%
+        group_by(barcode, chain_type) %>%
+        summarise(n = n(), .groups = "drop") %>%
+        filter(chain_type != "unknown")
+
+    # For each barcode, determine the dominant chain type
+    dominant_chains <- chain_counts %>%
+        group_by(barcode) %>%
+        slice_max(n, n = 1, with_ties = FALSE) %>%
+        select(barcode, dominant_chain = chain_type)
+
+    # Build list of valid sample_ids (barcode + dominant chain)
+    valid_samples <- dominant_chains %>%
+        mutate(sample_id = paste0(barcode, "_", dominant_chain)) %>%
+        pull(sample_id)
+
+    # Filter to keep only dominant chain per barcode
+    contamination <- setdiff(unique(db\$sample_id), valid_samples)
     if (length(contamination) > 0) {
-        db <- db %>% filter(!sample_id %in% contamination)
-        message("Filtered out contamination samples: ", paste(contamination, collapse = ", "))
+        message("Auto-detected contamination (minority chain types): ", paste(contamination, collapse = ", "))
+        db <- db %>% filter(sample_id %in% valid_samples)
     }
-    message("Remaining samples: ", paste(unique(db\$sample_id), collapse = ", "))
+    message("Remaining samples after filtering: ", paste(unique(db\$sample_id), collapse = ", "))
+
+    # Clean up temporary columns
+    db <- db %>% select(-barcode, -chain_type)
 
     # Check if clone_id column exists
     has_clone_id <- "clone_id" %in% colnames(db)
