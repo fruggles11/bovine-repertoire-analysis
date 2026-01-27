@@ -571,6 +571,32 @@ process DIVERSITY_ANALYSIS {
     ggsave("plots/v_gene_usage.pdf", p2, width = 14, height = 6)
     ggsave("plots/v_gene_usage.png", p2, width = 14, height = 6, dpi = 150)
 
+    # D gene usage (heavy chain only)
+    d_usage <- db %>%
+        filter(!is.na(d_call) & d_call != "") %>%
+        mutate(d_gene = gsub("\\\\*.*", "", d_call)) %>%
+        group_by(sample_id, d_gene) %>%
+        summarise(count = n(), .groups = "drop") %>%
+        group_by(sample_id) %>%
+        mutate(freq = count / sum(count))
+
+    if (nrow(d_usage) > 0) {
+        write.csv(d_usage, "stats/d_gene_usage.csv", row.names = FALSE)
+
+        p_d <- ggplot(d_usage, aes(x = reorder(d_gene, -freq), y = freq, fill = sample_id)) +
+            geom_bar(stat = "identity", position = "dodge") +
+            labs(title = "D Gene Usage (Heavy Chain)",
+                 x = "D Gene",
+                 y = "Frequency") +
+            theme_minimal() +
+            theme(axis.text.x = element_text(angle = 45, hjust = 1),
+                  legend.position = "bottom")
+        ggsave("plots/d_gene_usage.pdf", p_d, width = 10, height = 6)
+        ggsave("plots/d_gene_usage.png", p_d, width = 10, height = 6, dpi = 150)
+    } else {
+        message("No D gene calls found (D genes only present in heavy chain)")
+    }
+
     # J gene usage
     j_usage <- db %>%
         filter(!is.na(j_call)) %>%
