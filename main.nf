@@ -25,12 +25,23 @@ nextflow.enable.dsl=2
 workflow {
 
     // Input channel from FASTA files
-    ch_fasta = Channel
-        .fromPath( params.fasta_input )
-        .map { fasta ->
-            def sample_id = fasta.baseName.replaceAll(/_unique$/, '').replaceAll(/_nogroup$/, '')
-            tuple( sample_id, fasta )
-        }
+    // If input_dir is provided, recursively find all *_unique.fasta files
+    // Otherwise use the fasta_input glob pattern
+    if ( params.input_dir ) {
+        ch_fasta = Channel
+            .fromPath( "${params.input_dir}/**/*_unique.fasta" )
+            .map { fasta ->
+                def sample_id = fasta.baseName.replaceAll(/_unique$/, '').replaceAll(/_nogroup$/, '')
+                tuple( sample_id, fasta )
+            }
+    } else {
+        ch_fasta = Channel
+            .fromPath( params.fasta_input )
+            .map { fasta ->
+                def sample_id = fasta.baseName.replaceAll(/_unique$/, '').replaceAll(/_nogroup$/, '')
+                tuple( sample_id, fasta )
+            }
+    }
 
     // Germline database is required for bovine (not available via fetch_imgtdb.sh)
     if ( !params.germline_db ) {
@@ -103,6 +114,7 @@ workflow {
 // --------------------------------------------------------------- //
 
 params.fasta_input = "${launchDir}/*_unique.fasta"
+params.input_dir = null    // Directory to recursively search for *_unique.fasta files
 params.germline_db = null  // Path to pre-built germline FASTA files
 params.species = "bovine"
 params.chain = "IG"  // IG for immunoglobulin

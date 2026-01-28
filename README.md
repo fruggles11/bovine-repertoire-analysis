@@ -25,18 +25,14 @@ Analyzes antibody repertoire diversity from bovine IgG sequences using the [Immc
 # 1. Download bovine germlines from IMGT (see Germline Database section below)
 #    Save FASTA files to a germlines/ directory
 
-# 2. From the bovine-igg-pipeline results directory
-cd /path/to/results/4_consensus_sequences
-
-# 3. Collect all unique FASTA files
-rm -rf analysis_input && mkdir -p analysis_input && find . -path ./analysis_input -prune -o -name "*_unique.fasta" -exec cp {} ./analysis_input/ \;
-
-# 4. Run the pipeline (germline_db is required for bovine)
+# 2. Run the pipeline on your bovine-igg-pipeline results
 nextflow run fruggles11/bovine-repertoire-analysis \
     --germline_db '/path/to/germlines/*.fasta' \
-    --fasta_input 'analysis_input/*_unique.fasta' \
+    --input_dir '/path/to/results/4_consensus_sequences' \
     --results ./repertoire_results
 ```
+
+The pipeline will automatically find all `*_unique.fasta` files recursively within the input directory.
 
 ## Input
 
@@ -49,7 +45,8 @@ The pipeline accepts FASTA files containing antibody sequences. These can be:
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `--fasta_input` | `*_unique.fasta` | Glob pattern for input FASTA files |
+| `--input_dir` | none | Directory to recursively search for `*_unique.fasta` files (recommended) |
+| `--fasta_input` | `*_unique.fasta` | Glob pattern for input FASTA files (alternative to input_dir) |
 | `--germline_db` | **required** | Path to bovine germline FASTAs (glob pattern) |
 | `--results` | `./results` | Output directory |
 | `--clone_threshold` | 0.15 | Junction distance threshold for clonotype definition |
@@ -134,7 +131,7 @@ mkdir -p germlines
 # Then run:
 nextflow run fruggles11/bovine-repertoire-analysis \
     --germline_db './germlines/*.fasta' \
-    --fasta_input 'analysis_input/*_unique.fasta'
+    --input_dir '/path/to/results/4_consensus_sequences'
 ```
 
 ## Diversity Metrics
