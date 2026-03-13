@@ -182,17 +182,17 @@ process BUILD_IGBLAST_DB {
 
     # V genes (IGHV, IGKV, IGLV)
     # Search recursively to handle both individual files and directory inputs
-    find -L . -type f \( -iname "*IGHV*" -o -iname "*IGKV*" -o -iname "*IGLV*" \) | while read f; do
+    find -L . -type f \\( -iname "*IGHV*" -o -iname "*IGKV*" -o -iname "*IGLV*" \\) | while read f; do
         cat "\$f" >> database/bovine_V.fasta 2>/dev/null
     done
 
     # D genes (IGHD only - light chains don't have D)
-    find -L . -type f \( -iname "*IGHD*" \) | while read f; do
+    find -L . -type f -iname "*IGHD*" | while read f; do
         cat "\$f" >> database/bovine_D.fasta 2>/dev/null
     done
 
     # J genes (IGHJ, IGKJ, IGLJ)
-    find -L . -type f \( -iname "*IGHJ*" -o -iname "*IGKJ*" -o -iname "*IGLJ*" \) | while read f; do
+    find -L . -type f \\( -iname "*IGHJ*" -o -iname "*IGKJ*" -o -iname "*IGLJ*" \\) | while read f; do
         cat "\$f" >> database/bovine_J.fasta 2>/dev/null
     done
 
@@ -313,13 +313,13 @@ process MAKEDB {
     script:
     """
     # Combine germline references - search recursively to handle directory inputs
-    find . -type f \( -iname "*IGHV*" -o -iname "*IGKV*" -o -iname "*IGLV*" \) | while read f; do
+    find -L . -type f \\( -iname "*IGHV*" -o -iname "*IGKV*" -o -iname "*IGLV*" \\) | while read f; do
         cat "\$f" >> combined_V.fasta 2>/dev/null
     done
-    find . -type f \( -iname "*IGHD*" \) | while read f; do
+    find -L . -type f -iname "*IGHD*" | while read f; do
         cat "\$f" >> combined_D.fasta 2>/dev/null
     done
-    find . -type f \( -iname "*IGHJ*" -o -iname "*IGKJ*" -o -iname "*IGLJ*" \) | while read f; do
+    find -L . -type f \\( -iname "*IGHJ*" -o -iname "*IGKJ*" -o -iname "*IGLJ*" \\) | while read f; do
         cat "\$f" >> combined_J.fasta 2>/dev/null
     done
 
