@@ -27,7 +27,7 @@ Analyzes antibody repertoire diversity from bovine IgG sequences using the [Immc
 
 # 2. Run the pipeline on your bovine-igg-pipeline results
 nextflow run fruggles11/bovine-repertoire-analysis \
-    --germline_db '/path/to/germlines/*.fasta' \
+    --germline_db '/path/to/germlines' \
     --input_dir '/path/to/results/4_consensus_sequences' \
     --results ./repertoire_results
 ```
@@ -47,7 +47,7 @@ The pipeline accepts FASTA files containing antibody sequences. These can be:
 |-----------|---------|-------------|
 | `--input_dir` | none | Directory to recursively search for `*_unique.fasta` files (recommended) |
 | `--fasta_input` | `*_unique.fasta` | Glob pattern for input FASTA files (alternative to input_dir) |
-| `--germline_db` | **required** | Path to bovine germline FASTAs (glob pattern) |
+| `--germline_db` | **required** | Path to bovine germline FASTAs (glob pattern or directory) |
 | `--results` | `./results` | Output directory |
 | `--clone_threshold` | 0.15 | Junction distance threshold for clonotype definition |
 
@@ -111,7 +111,7 @@ The pipeline requires bovine immunoglobulin germline sequences. **Manual downloa
    - **IGLV**, **IGLJ** - Lambda chain
 
 7. Save all FASTA files to a single directory (e.g., `germlines/`)
-8. Provide the path via `--germline_db './germlines/*.fasta'`
+8. Provide the path via `--germline_db './germlines/*.fasta'` or simply `--germline_db './germlines'`
 
 ### Why IMGT-gapped sequences?
 
