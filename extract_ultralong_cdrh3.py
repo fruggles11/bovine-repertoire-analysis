@@ -49,6 +49,8 @@ def extract_ultralong(input_dir, output_file, threshold=50):
         with open(tsv, newline="") as fh:
             reader = csv.DictReader(fh, delimiter="\t")
             for row in reader:
+                if "IGHV" not in (row.get("v_call", "") or ""):
+                    continue
                 jaa = row.get("junction_aa", "")
                 length = cdrh3_length_aa(jaa)
                 if length is not None and length >= threshold:

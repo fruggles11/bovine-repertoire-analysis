@@ -129,9 +129,12 @@ for tsv in tsv_files:
     with open(tsv, newline='') as fh:
         reader = csv.DictReader(fh, delimiter='\\t')
         for row in reader:
+            v_call = row.get('v_call', '') or ''
             jaa = row.get('junction_aa', '') or ''
             # CDR3H3 length = junction_aa minus the two anchor residues (Cys + Trp/Phe)
             cdrh3_len = len(jaa) - 2 if len(jaa) >= 2 else 0
+            if 'IGHV' not in v_call:
+                continue
             if cdrh3_len >= threshold:
                 row['cdrh3_length_aa'] = cdrh3_len
                 row['barcode'] = barcode
