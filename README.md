@@ -148,6 +148,8 @@ nextflow run fruggles11/bovine-repertoire-analysis \
 
 Bovine heavy chains uniquely produce CDR3H3 regions up to 70+ amino acids long — far exceeding the ~15 aa typical in humans. This pipeline identifies these ultra-long sequences from the majority consensus FASTAs output by [bovine-igg-pipeline](https://github.com/fruggles11/bovine-igg-pipeline).
 
+Only sequences with a confirmed IGHV gene call are reported — IgBLAST occasionally assigns light chain germlines (IGLV) to heavy chain sequences, so this filter prevents false positives.
+
 ### Quick Start
 
 ```bash
@@ -165,6 +167,8 @@ nextflow run fruggles11/bovine-repertoire-analysis/ultralong_cdrh3_filter.nf \
 | `--min_cdr3_aa` | `40` | Minimum CDR3H3 length in amino acids |
 | `--results` | `./ultralong_results` | Output directory |
 
+The 40 aa default threshold is based on the bimodal distribution observed in bovine heavy chain repertoire data, where the ultra-long population is clearly separated from the normal-length population (which peaks at 17–26 aa).
+
 ### Output
 
 ```
@@ -178,8 +182,12 @@ ultralong_results/
 
 The FASTA headers include V gene assignment and CDR3H3 length:
 ```
->barcode01_heavy_0_0 v_call=IGHV1-7*01 cdrh3_aa=67
+>barcode41_barcode41 v_call=IGHV1-7*02 cdrh3_aa=62
 ```
+
+### Notes on CDR3H3 detection
+
+IgBLAST reports `Total identifiable CDR3 = 0` for some ultra-long sequences because the CDR3 length exceeds its internal heuristic window. In practice this means sequences with very long CDR3s (>55 aa) are reliably detected, while sequences in the 40–50 aa range may occasionally be missed or have slightly underestimated lengths. Running with `--min_cdr3_aa 40` captures the full ultra-long population with minimal false positives when the IGHV filter is applied.
 
 ### Utilities
 
@@ -187,9 +195,9 @@ The FASTA headers include V gene assignment and CDR3H3 length:
 
 ```bash
 python3 extract_ultralong_cdrh3.py \
-    --input-dir repertoire_results/filtered \
+    --input-dir ultralong_results/filtered \
     --output ultralong_cdrh3_sequences.tsv \
-    --threshold 50
+    --threshold 40
 ```
 
 ---
