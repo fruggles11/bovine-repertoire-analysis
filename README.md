@@ -162,7 +162,7 @@ nextflow run fruggles11/bovine-repertoire-analysis/ultralong_cdrh3_filter.nf \
 |-----------|---------|-------------|
 | `--fasta_dir` | `./results/5_majority_consensus` | Directory containing `*_heavy_majority.fasta` files from bovine-igg-pipeline |
 | `--germline_db` | **required** | Glob pattern for bovine germline FASTAs from IMGT (same files as main pipeline) |
-| `--min_cdr3_aa` | `50` | Minimum CDR3H3 length in amino acids |
+| `--min_cdr3_aa` | `40` | Minimum CDR3H3 length in amino acids |
 | `--results` | `./ultralong_results` | Output directory |
 
 ### Output

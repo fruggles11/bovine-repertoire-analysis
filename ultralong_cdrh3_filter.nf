@@ -35,7 +35,7 @@ include { BUILD_IGBLAST_DB; IGBLAST_ANNOTATION; MAKEDB; FILTER_PRODUCTIVE } from
 
 params.fasta_dir             = "${launchDir}/results/5_majority_consensus"
 params.germline_db           = null
-params.min_cdr3_aa           = 50
+params.min_cdr3_aa           = 40
 params.results               = "${launchDir}/ultralong_results"
 params.skip_productive_filter = true   // productivity detection unreliable for bovine
 

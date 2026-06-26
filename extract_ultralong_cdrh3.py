@@ -2,8 +2,8 @@
 """
 Extract bovine sequences with ultra-long CDRH3 regions from AIRR repertoire TSV files.
 
-Bovine ultra-long CDRH3 threshold: >= 50 aa (based on the bimodal distribution
-observed in this dataset, with a dense cluster at 49-68 aa distinct from the
+Bovine ultra-long CDRH3 threshold: >= 40 aa (based on the bimodal distribution
+observed in this dataset, with a dense cluster at 40-68 aa distinct from the
 normal-length population peaking at 17-26 aa).
 """
 
@@ -106,8 +106,8 @@ def main():
     parser.add_argument(
         "--threshold",
         type=int,
-        default=50,
-        help="Minimum CDRH3 length in amino acids (default: 50)"
+        default=40,
+        help="Minimum CDRH3 length in amino acids (default: 40)"
     )
     args = parser.parse_args()
 
