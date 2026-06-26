@@ -1,6 +1,13 @@
 # Bovine IgG Repertoire Analysis Pipeline
 
-Analyzes antibody repertoire diversity from bovine IgG sequences using the [Immcantation](https://immcantation.readthedocs.io/) framework.
+Analyzes antibody repertoire diversity from bovine IgG sequences using the [Immcantation](https://immcantation.readthedocs.io/) framework. Includes a dedicated pipeline for extracting heavy chain sequences with ultra-long CDR3H3 regions, a hallmark feature of bovine immunoglobulins.
+
+## Pipelines
+
+| Pipeline | Script | Purpose |
+|----------|--------|---------|
+| Repertoire analysis | `main.nf` | Full V(D)J annotation, clonotype assignment, diversity analysis |
+| Ultra-long CDR3H3 filter | `ultralong_cdrh3_filter.nf` | Extract heavy chains with CDR3H3 ≥ 50 aa for downstream use |
 
 ## Features
 
@@ -13,6 +20,7 @@ Analyzes antibody repertoire diversity from bovine IgG sequences using the [Immc
   - Hill diversity curves
   - Rarefaction curves
   - Simpson and Shannon diversity indices
+- **Ultra-long CDR3H3 extraction** for identifying bovine-specific ultra-long CDR3H3 sequences
 
 ## Requirements
 
@@ -133,6 +141,58 @@ nextflow run fruggles11/bovine-repertoire-analysis \
     --germline_db './germlines/*.fasta' \
     --input_dir '/path/to/results/4_consensus_sequences'
 ```
+
+---
+
+## Ultra-Long CDR3H3 Filter (`ultralong_cdrh3_filter.nf`)
+
+Bovine heavy chains uniquely produce CDR3H3 regions up to 70+ amino acids long — far exceeding the ~15 aa typical in humans. This pipeline identifies these ultra-long sequences from the majority consensus FASTAs output by [bovine-igg-pipeline](https://github.com/fruggles11/bovine-igg-pipeline).
+
+### Quick Start
+
+```bash
+nextflow run fruggles11/bovine-repertoire-analysis/ultralong_cdrh3_filter.nf \
+    --fasta_dir /path/to/results/5_majority_consensus \
+    --germline_db '/path/to/germlines/*.fasta'
+```
+
+### Parameters
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `--fasta_dir` | `./results/5_majority_consensus` | Directory containing `*_heavy_majority.fasta` files from bovine-igg-pipeline |
+| `--germline_db` | **required** | Glob pattern for bovine germline FASTAs from IMGT (same files as main pipeline) |
+| `--min_cdr3_aa` | `50` | Minimum CDR3H3 length in amino acids |
+| `--results` | `./ultralong_results` | Output directory |
+
+### Output
+
+```
+ultralong_results/
+├── ultralong_cdrh3.fasta   # Filtered sequences sorted by CDR3H3 length (for Geneious import)
+├── ultralong_cdrh3.tsv     # Full AIRR annotation table with CDR3H3 length column
+├── igblast/                # Per-sample IgBLAST annotations
+├── airr/                   # Per-sample AIRR-format TSVs
+└── filtered/               # Per-sample productive TSVs
+```
+
+The FASTA headers include V gene assignment and CDR3H3 length:
+```
+>barcode01_heavy_0_0 v_call=IGHV1-7*01 cdrh3_aa=67
+```
+
+### Utilities
+
+**`extract_ultralong_cdrh3.py`** — standalone script for filtering an existing directory of `*_heavy_productive.tsv` files without re-running IgBLAST:
+
+```bash
+python3 extract_ultralong_cdrh3.py \
+    --input-dir repertoire_results/filtered \
+    --output ultralong_cdrh3_sequences.tsv \
+    --threshold 50
+```
+
+---
 
 ## Diversity Metrics
 
