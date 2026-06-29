@@ -146,24 +146,22 @@ def find_j_in_sequence(sequence, j_genes, anchor_len=20, min_identity=0.75):
     return (None, None, 0.0)
 
 
-def find_cys_before_trp(sequence, trp_pos, min_cdr3_aa=0, max_cdr3_nt=600):
+def find_cys_before_trp(sequence, trp_pos, max_cdr3_nt=600):
     """
     Scan backwards from trp_pos in steps of 3 (same reading frame as Trp)
     looking for TGT or TGC (Cys codon).  Returns the position of the first
-    Cys codon that gives CDR3H3 >= min_cdr3_aa, or None.
+    (closest to Trp) Cys codon found within max_cdr3_nt, or None.
 
-    Ultra-long bovine CDR3H3 regions contain internal Cys codons closer to the
-    Trp (giving short apparent CDR3 lengths) that must be skipped.  Returning
-    the first Cys that meets the length threshold gives the most conservative
-    (shortest) CDR3H3 that still satisfies the filter.
+    The caller (process_sequence) is responsible for filtering by min_cdr3_aa.
+    Returning the closest Cys is conservative: if the CDR3H3 is shorter than
+    min_cdr3_aa the sequence is correctly rejected rather than scanning further
+    into the V gene and producing a false positive.
     """
     seq_u = sequence.upper()
     for pos in range(trp_pos - 3, max(0, trp_pos - max_cdr3_nt) - 1, -3):
         codon = seq_u[pos: pos + 3]
         if codon in ('TGT', 'TGC'):
-            cdr3_aa = (trp_pos + 3 - pos) // 3 - 2
-            if cdr3_aa >= min_cdr3_aa:
-                return pos
+            return pos
     return None
 
 
@@ -188,7 +186,7 @@ def process_sequence(seq_id, sequence, j_genes,
         )
         if trp_pos is None:
             continue
-        cys_pos = find_cys_before_trp(test_seq, trp_pos, min_cdr3_aa=min_cdr3_aa)
+        cys_pos = find_cys_before_trp(test_seq, trp_pos)
         if cys_pos is None:
             continue
         junction_nt = extract_junction(test_seq, cys_pos, trp_pos)
