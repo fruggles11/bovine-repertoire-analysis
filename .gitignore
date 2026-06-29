@@ -1,0 +1,7 @@
+work/
+.nextflow/
+.nextflow.log*
+results/
+ultralong_results/
+ultralong_custom_cdr3/
+.DS_Store

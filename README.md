@@ -30,10 +30,20 @@ Analyzes antibody repertoire diversity from bovine IgG sequences using the [Immc
 ## Quick Start
 
 ```bash
-# 1. Download bovine germlines from IMGT (see Germline Database section below)
-#    Save FASTA files to a germlines/ directory
+# Bovine germline sequences are bundled in the bovine_germline/ directory.
+# Clone the repo and point --germline_db at it:
+git clone https://github.com/fruggles11/bovine-repertoire-analysis
+cd bovine-repertoire-analysis
 
-# 2. Run the pipeline on your bovine-igg-pipeline results
+nextflow run . \
+    --germline_db './bovine_germline' \
+    --input_dir '/path/to/results/4_consensus_sequences' \
+    --results ./repertoire_results
+```
+
+Or run directly from GitHub (germlines must be downloaded separately — see [Germline Database](#germline-database-required)):
+
+```bash
 nextflow run fruggles11/bovine-repertoire-analysis \
     --germline_db '/path/to/germlines' \
     --input_dir '/path/to/results/4_consensus_sequences' \
@@ -199,6 +209,30 @@ python3 extract_ultralong_cdrh3.py \
     --output ultralong_cdrh3_sequences.tsv \
     --threshold 40
 ```
+
+**`custom_cdr3_filter.py`** — alternative CDR3H3 extractor that bypasses IgBLAST's CDR3 detection entirely. IgBLAST reports `Total identifiable CDR3 = 0` for very long CDR3s (>55 aa) because they exceed its internal heuristic window; this script instead searches the consensus FASTA directly for the conserved Cys (FR3 end) and Trp (J gene IMGT position 118) anchor codons via J gene pattern matching. Use this when IgBLAST-based detection is missing sequences in the 40–55 aa range.
+
+```bash
+python3 custom_cdr3_filter.py \
+    --airr_dir  ultralong_results/filtered \
+    --fasta_dir results/5_majority_consensus \
+    --germline  bovine_germline/Bos_taurus_IgHJ_gaps.fasta \
+    --output_dir ultralong_custom_cdr3 \
+    --min_cdr3_aa 40
+```
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `--airr_dir` | required | Directory with `*_heavy_productive.tsv` AIRR files (from the pipeline's `filtered/` output) |
+| `--fasta_dir` | required | Directory with `*_heavy_majority.fasta` files (from bovine-igg-pipeline `5_majority_consensus/`) |
+| `--germline` | required | Bovine IGHJ germline FASTA (e.g. `bovine_germline/Bos_taurus_IgHJ_gaps.fasta`) |
+| `--output_dir` | `ultralong_custom_cdr3` | Output directory |
+| `--min_cdr3_aa` | `40` | Minimum CDR3H3 length in amino acids |
+| `--min_j_identity` | `0.75` | Minimum J gene anchor match identity |
+
+Output files in `--output_dir`:
+- `ultralong_cdrh3_custom.tsv` — full annotation table with CDR3H3 length, junction sequence, V/J calls
+- `ultralong_cdrh3_custom.fasta` — filtered sequences sorted by CDR3H3 length; headers include `v_call`, `j_call`, `cdrh3_aa`, and `junction_aa`
 
 ---
 
