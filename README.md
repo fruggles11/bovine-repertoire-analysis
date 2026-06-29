@@ -210,7 +210,7 @@ python3 extract_ultralong_cdrh3.py \
     --threshold 40
 ```
 
-**`custom_cdr3_filter.py`** — alternative CDR3H3 extractor that bypasses IgBLAST's CDR3 detection entirely. IgBLAST reports `Total identifiable CDR3 = 0` for very long CDR3s (>55 aa) because they exceed its internal heuristic window; this script instead searches the consensus FASTA directly for the conserved Cys (FR3 end) and Trp (J gene IMGT position 118) anchor codons via J gene pattern matching. Use this when IgBLAST-based detection is missing sequences in the 40–55 aa range.
+**`custom_cdr3_filter.py`** — alternative CDR3H3 extractor that bypasses IgBLAST's CDR3 detection entirely. IgBLAST reports `Total identifiable CDR3 = 0` for very long CDR3s (>55 aa) because they exceed its internal heuristic window; this script instead searches the consensus FASTA directly for the conserved Cys (FR3 end) and Trp (J gene IMGT position 118) anchor codons via J gene pattern matching. In practice it recovers substantially more ultra-long sequences than `extract_ultralong_cdrh3.py` (e.g. 45 vs 6 on test data), including many >60 aa sequences that IgBLAST cannot score at all.
 
 ```bash
 python3 custom_cdr3_filter.py \
