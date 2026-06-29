@@ -201,26 +201,14 @@ IgBLAST reports `Total identifiable CDR3 = 0` for some ultra-long sequences beca
 
 ### Utilities
 
-**`extract_ultralong_cdrh3.py`** — standalone script for filtering an existing directory of `*_heavy_productive.tsv` files without re-running IgBLAST:
+**`find_ultralong_cdrh3.py`** — standalone script that combines IgBLAST-based and J gene anchor CDR3H3 detection. IgBLAST results take precedence (more accurate lengths); the J gene anchor method runs as a fallback on barcodes IgBLAST did not detect.
 
 ```bash
-python3 extract_ultralong_cdrh3.py \
-    --input-dir ultralong_results/filtered \
-    --output ultralong_cdrh3_sequences.tsv \
-    --threshold 40
-```
-
-**`custom_cdr3_filter.py`** — alternative CDR3H3 extractor that bypasses IgBLAST's CDR3 detection entirely. IgBLAST reports `Total identifiable CDR3 = 0` for very long CDR3s (>55 aa) because they exceed its internal heuristic window; this script instead searches the consensus FASTA directly for the conserved Cys (FR3 end) and Trp (J gene IMGT position 118) anchor codons via J gene pattern matching.
-
-> **Note:** The script correctly recovers CDR3H3 lengths for sequences where the first Cys encountered (closest to the Trp) already gives CDR3H3 ≥ `--min_cdr3_aa`. However, bovine ultra-long CDR3H3 regions frequently contain **internal Cys codons** — the closest Cys to the Trp is an internal CDR3 residue, not the FR3-boundary Cys. Without aligning to the V gene germline to locate FR3 exactly, the script cannot reliably recover the true CDR3 start for these sequences. In practice, `extract_ultralong_cdrh3.py` (which relies on IgBLAST's junction annotation) remains the more reliable filter for this dataset.
-
-```bash
-python3 custom_cdr3_filter.py \
+python3 find_ultralong_cdrh3.py \
     --airr_dir  ultralong_results/filtered \
     --fasta_dir results/5_majority_consensus \
     --germline  bovine_germline/Bos_taurus_IgHJ_gaps.fasta \
-    --output_dir ultralong_custom_cdr3 \
-    --min_cdr3_aa 40
+    --output_dir ultralong_cdrh3
 ```
 
 | Parameter | Default | Description |
@@ -228,13 +216,13 @@ python3 custom_cdr3_filter.py \
 | `--airr_dir` | required | Directory with `*_heavy_productive.tsv` AIRR files (from the pipeline's `filtered/` output) |
 | `--fasta_dir` | required | Directory with `*_heavy_majority.fasta` files (from bovine-igg-pipeline `5_majority_consensus/`) |
 | `--germline` | required | Bovine IGHJ germline FASTA (e.g. `bovine_germline/Bos_taurus_IgHJ_gaps.fasta`) |
-| `--output_dir` | `ultralong_custom_cdr3` | Output directory |
+| `--output_dir` | `ultralong_cdrh3` | Output directory |
 | `--min_cdr3_aa` | `40` | Minimum CDR3H3 length in amino acids |
 | `--min_j_identity` | `0.75` | Minimum J gene anchor match identity |
 
 Output files in `--output_dir`:
-- `ultralong_cdrh3_custom.tsv` — full annotation table with CDR3H3 length, junction sequence, V/J calls
-- `ultralong_cdrh3_custom.fasta` — filtered sequences sorted by CDR3H3 length; headers include `v_call`, `j_call`, `cdrh3_aa`, and `junction_aa`
+- `ultralong_cdrh3.tsv` — annotation table with CDR3H3 length, junction sequence, V/J/D calls, and `source` column (`igblast` or `anchor`)
+- `ultralong_cdrh3.fasta` — sequences sorted by CDR3H3 length descending; headers include `v_call`, `cdrh3_aa`, and `source`
 
 ---
 
