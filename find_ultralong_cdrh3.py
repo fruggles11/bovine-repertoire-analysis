@@ -99,11 +99,13 @@ def parse_fasta(path):
 
 def detect_igblast(airr_dir, min_cdr3_aa):
     """
-    Read *_heavy_productive.tsv files and return rows where IgBLAST annotated
+    Read *_heavy_productive.tsv files and return all rows where IgBLAST annotated
     a CDR3H3 >= min_cdr3_aa with an IGHV v_call.
-    Returns dict: barcode -> unified result dict.
+    Returns (list of result dicts, set of barcodes that had any hit).
+    Keeps all qualifying sequences per barcode (repertoire data may have many).
     """
-    results = {}
+    results = []
+    hit_barcodes = set()
     for tsv_file in sorted(Path(airr_dir).glob('*_heavy_productive.tsv')):
         barcode = tsv_file.stem.split('_heavy')[0]
         with open(tsv_file) as f:
@@ -113,7 +115,8 @@ def detect_igblast(airr_dir, min_cdr3_aa):
                 jaa = row.get('junction_aa', '') or ''
                 length = max(0, len(jaa) - 2) if jaa else None
                 if length is not None and length >= min_cdr3_aa:
-                    results[barcode] = {
+                    hit_barcodes.add(barcode)
+                    results.append({
                         'barcode':         barcode,
                         'sequence_id':     row.get('sequence_id', barcode),
                         'cdrh3_length_aa': length,
@@ -125,8 +128,8 @@ def detect_igblast(airr_dir, min_cdr3_aa):
                         'junction_length': int(row.get('junction_length', 0) or 0),
                         'junction':        row.get('junction', ''),
                         'sequence':        row.get('sequence', ''),
-                    }
-    return results
+                    })
+    return results, hit_barcodes
 
 
 # ── Method 2: J gene anchor detection ────────────────────────────────────────
@@ -249,13 +252,16 @@ def main():
     )
     parser.add_argument('--airr_dir', required=True,
                         help='Directory with *_heavy_productive.tsv AIRR files '
-                             '(from ultralong_cdrh3_filter.nf filtered/ output)')
-    parser.add_argument('--fasta_dir', required=True,
+                             '(from ultralong_cdrh3_filter.nf filtered/ output, '
+                             'or main pipeline repertoire_results/filtered/)')
+    parser.add_argument('--fasta_dir', default=None,
                         help='Directory with *_heavy_majority.fasta files '
-                             '(from bovine-igg-pipeline 5_majority_consensus/)')
-    parser.add_argument('--germline', required=True,
+                             '(from bovine-igg-pipeline 5_majority_consensus/). '
+                             'Optional — if omitted, only IgBLAST-based detection runs.')
+    parser.add_argument('--germline', default=None,
                         help='Bovine IGHJ germline FASTA '
-                             '(e.g. bovine_germline/Bos_taurus_IgHJ_gaps.fasta)')
+                             '(e.g. bovine_germline/Bos_taurus_IgHJ_gaps.fasta). '
+                             'Required when --fasta_dir is provided.')
     parser.add_argument('--output_dir', default='ultralong_cdrh3',
                         help='Output directory (default: ultralong_cdrh3)')
     parser.add_argument('--min_cdr3_aa', type=int, default=40,
@@ -269,29 +275,35 @@ def main():
 
     # Method 1: IgBLAST
     print('Method 1: IgBLAST annotation')
-    igblast_hits = detect_igblast(args.airr_dir, args.min_cdr3_aa)
-    for bc, r in sorted(igblast_hits.items(), key=lambda x: -x[1]['cdrh3_length_aa']):
-        print(f'  {bc}: {r["cdrh3_length_aa"]} aa  v={r["v_call"]}  j={r["j_call"]}')
+    igblast_hits, igblast_barcodes = detect_igblast(args.airr_dir, args.min_cdr3_aa)
+    for r in sorted(igblast_hits, key=lambda x: -x['cdrh3_length_aa']):
+        print(f'  {r["barcode"]}: {r["cdrh3_length_aa"]} aa  v={r["v_call"]}  j={r["j_call"]}')
     print(f'  → {len(igblast_hits)} sequences\n')
 
     # Method 2: J gene anchor (only on barcodes IgBLAST missed)
-    print('Method 2: J gene anchor matching')
-    print(f'  Loading J germlines from {args.germline}')
-    j_genes = load_j_germlines(args.germline)
-    print(f'  Loaded {len(j_genes)} J genes')
-    anchor_hits = detect_anchor(
-        args.fasta_dir, args.airr_dir, j_genes,
-        skip_barcodes=set(igblast_hits),
-        min_cdr3_aa=args.min_cdr3_aa,
-        min_j_identity=args.min_j_identity,
-    )
-    for bc, r in sorted(anchor_hits.items(), key=lambda x: -x[1]['cdrh3_length_aa']):
-        print(f'  {bc}: {r["cdrh3_length_aa"]} aa  v={r["v_call"]}  j={r["j_call"]}')
-    print(f'  → {len(anchor_hits)} sequences\n')
+    anchor_hits = {}
+    if args.fasta_dir and args.germline:
+        print('Method 2: J gene anchor matching')
+        print(f'  Loading J germlines from {args.germline}')
+        j_genes = load_j_germlines(args.germline)
+        print(f'  Loaded {len(j_genes)} J genes')
+        anchor_hits = detect_anchor(
+            args.fasta_dir, args.airr_dir, j_genes,
+            skip_barcodes=igblast_barcodes,
+            min_cdr3_aa=args.min_cdr3_aa,
+            min_j_identity=args.min_j_identity,
+        )
+        for bc, r in sorted(anchor_hits.items(), key=lambda x: -x[1]['cdrh3_length_aa']):
+            print(f'  {bc}: {r["cdrh3_length_aa"]} aa  v={r["v_call"]}  j={r["j_call"]}')
+        print(f'  → {len(anchor_hits)} sequences\n')
+    else:
+        print('Method 2: skipped (--fasta_dir/--germline not provided)\n')
 
-    # Merge: IgBLAST preferred, anchor as fallback
-    merged = {**anchor_hits, **igblast_hits}
-    results = sorted(merged.values(), key=lambda r: r['cdrh3_length_aa'], reverse=True)
+    # Merge: all IgBLAST sequences + anchor results for barcodes IgBLAST missed
+    results = sorted(
+        igblast_hits + list(anchor_hits.values()),
+        key=lambda r: r['cdrh3_length_aa'], reverse=True
+    )
 
     print(f'Total: {len(results)} sequences with CDR3H3 >= {args.min_cdr3_aa} aa')
     print(f'  {len(igblast_hits)} from IgBLAST  |  {len(anchor_hits)} from J anchor\n')
