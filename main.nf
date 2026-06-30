@@ -29,16 +29,22 @@ workflow {
     // Otherwise use the fasta_input glob pattern
     if ( params.input_dir ) {
         ch_fasta = Channel
-            .fromPath( "${params.input_dir}/**/*_unique.fasta" )
+            .fromPath( "${params.input_dir}/**.fasta" )
             .map { fasta ->
-                def sample_id = fasta.baseName.replaceAll(/_unique$/, '').replaceAll(/_nogroup$/, '')
+                def sample_id = fasta.baseName
+                    .replaceAll(/_unique$/, '')
+                    .replaceAll(/_majority$/, '')
+                    .replaceAll(/_nogroup$/, '')
                 tuple( sample_id, fasta )
             }
     } else {
         ch_fasta = Channel
             .fromPath( params.fasta_input )
             .map { fasta ->
-                def sample_id = fasta.baseName.replaceAll(/_unique$/, '').replaceAll(/_nogroup$/, '')
+                def sample_id = fasta.baseName
+                    .replaceAll(/_unique$/, '')
+                    .replaceAll(/_majority$/, '')
+                    .replaceAll(/_nogroup$/, '')
                 tuple( sample_id, fasta )
             }
     }
@@ -688,11 +694,15 @@ process DIVERSITY_ANALYSIS {
             })
 
             if (!is.null(rarefaction)) {
-                p6 <- plot(rarefaction, legend_title = "Sample") +
-                    labs(title = "Clonal Abundance Rarefaction") +
-                    theme_minimal()
-                ggsave("plots/rarefaction_curve.pdf", p6, width = 10, height = 6)
-                ggsave("plots/rarefaction_curve.png", p6, width = 10, height = 6, dpi = 150)
+                tryCatch({
+                    p6 <- plot(rarefaction, legend_title = "Sample") +
+                        labs(title = "Clonal Abundance Rarefaction") +
+                        theme_minimal()
+                    ggsave("plots/rarefaction_curve.pdf", p6, width = 10, height = 6)
+                    ggsave("plots/rarefaction_curve.png", p6, width = 10, height = 6, dpi = 150)
+                }, error = function(e) {
+                    message("Could not plot rarefaction curve: ", e\$message)
+                })
             }
         }
 
