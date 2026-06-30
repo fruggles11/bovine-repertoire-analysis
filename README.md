@@ -35,7 +35,7 @@ python3 find_ultralong_cdrh3.py \
     --output_dir ultralong_cdrh3
 ```
 
-If `main.nf` is crashing, use `ultralong_cdrh3_filter.nf` as a workaround (see [below](#ultra-long-cdrh3-filter-ultralong_cdrh3_filternf)):
+If `main.nf` is unavailable, use `ultralong_cdrh3_filter.nf` as a fallback (see [below](#ultra-long-cdrh3-filter-ultralong_cdrh3_filternf)):
 
 ```bash
 # Run the standalone ultra-long CDR3H3 pipeline instead
@@ -58,7 +58,7 @@ python3 find_ultralong_cdrh3.py \
 | Pipeline | Script | Purpose |
 |----------|--------|---------|
 | Repertoire analysis | `main.nf` | Full V(D)J annotation, clonotype assignment, diversity analysis |
-| Ultra-long CDR3H3 filter | `ultralong_cdrh3_filter.nf` | Workaround — runs IgBLAST on majority consensus FASTAs only, for when `main.nf` crashes |
+| Ultra-long CDR3H3 filter | `ultralong_cdrh3_filter.nf` | Fallback — runs IgBLAST on majority consensus FASTAs only, without full diversity analysis |
 
 ## Features
 
@@ -101,12 +101,13 @@ nextflow run fruggles11/bovine-repertoire-analysis \
     --results ./repertoire_results
 ```
 
-The pipeline will automatically find all `*_unique.fasta` files recursively within the input directory.
+The pipeline will automatically find all `*.fasta` files recursively within the input directory.
 
 ## Input
 
 The pipeline accepts FASTA files containing antibody sequences. These can be:
 - `*_unique.fasta` files from the bovine-igg-pipeline
+- `*_majority.fasta` files from the bovine-igg-pipeline `5_majority_consensus/` step
 - `*_nogroup_unique.fasta` files
 - Any FASTA with antibody V(D)J sequences
 
@@ -114,7 +115,7 @@ The pipeline accepts FASTA files containing antibody sequences. These can be:
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `--input_dir` | none | Directory to recursively search for `*_unique.fasta` files (recommended) |
+| `--input_dir` | none | Directory to recursively search for `*.fasta` files (recommended) |
 | `--fasta_input` | `*_unique.fasta` | Glob pattern for input FASTA files (alternative to input_dir) |
 | `--germline_db` | **required** | Path to bovine germline FASTAs (glob pattern or directory) |
 | `--results` | `./results` | Output directory |
@@ -195,7 +196,7 @@ Without gaps, the pipeline will run but produce empty CDR3 data and incorrect di
 
 ## Ultra-Long CDR3H3 Filter (`ultralong_cdrh3_filter.nf`)
 
-> **Note:** This pipeline was created as a workaround for instability in `main.nf`. If `main.nf` is running correctly, use that instead and run `find_ultralong_cdrh3.py` on its `filtered/` output.
+> **Note:** This pipeline is a lightweight fallback. If `main.nf` is available, use that instead — it produces full diversity analysis and AIRR output, and `find_ultralong_cdrh3.py` can be run on its `filtered/` output.
 
 Bovine heavy chains uniquely produce CDR3H3 regions up to 70+ amino acids long — far exceeding the ~15 aa typical in humans. This pipeline runs IgBLAST directly on the majority consensus FASTAs from [bovine-igg-pipeline](https://github.com/fruggles11/bovine-igg-pipeline) to identify these ultra-long sequences.
 
