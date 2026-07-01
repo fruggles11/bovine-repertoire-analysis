@@ -89,14 +89,31 @@ workflow {
         ch_germline.collect()
     )
 
+    // Backfill CDR3/junction calls IgBLAST's heuristic missed (e.g. bovine
+    // ultra-long CDR3H3, which exceed its internal detection window)
+    INFER_JUNCTION(
+        MAKEDB.out,
+        ch_germline.collect(),
+        file("${projectDir}/bin/infer_missing_junction.py")
+    )
+
     // Filter for productive sequences
     FILTER_PRODUCTIVE(
-        MAKEDB.out
+        INFER_JUNCTION.out
     )
 
     // Define clones
     DEFINE_CLONES(
         FILTER_PRODUCTIVE.out
+    )
+
+    // Combine per-barcode AIRR TSVs into one VDJ summary TSV
+    // (barcode, chain, v_call, d_call, j_call, productive, v_identity, junction_aa_length)
+    SUMMARIZE_VDJ(
+        FILTER_PRODUCTIVE.out
+            .map { sample_id, tsv -> tsv }
+            .collect(),
+        file("${projectDir}/bin/summarize_vdj.py")
     )
 
     // Collect all samples for combined analysis
@@ -365,6 +382,37 @@ process MAKEDB {
     """
 }
 
+process INFER_JUNCTION {
+
+    tag "${sample_id}"
+    publishDir "${params.results}/airr_junction_filled", mode: 'copy'
+
+    input:
+    tuple val(sample_id), path(airr_tsv)
+    path germlines
+    path infer_script
+
+    output:
+    tuple val(sample_id), path("${sample_id}_db-pass.tsv")
+
+    script:
+    """
+    # Heavy-chain J germline only - the anchor fallback targets CDR3H3.
+    # IgBLAST's junction heuristic silently leaves junction_aa blank for
+    # some bovine heavy chain sequences (e.g. ultra-long CDR3H3, which
+    # exceed its internal detection window) even though V/D/J were called.
+    find -L . -type f -iname "*IGHJ*" | while read f; do
+        cat "\$f" >> ighj_germline.fasta 2>/dev/null
+    done
+    touch ighj_germline.fasta
+
+    python3 ${infer_script} \
+        --input ${airr_tsv} \
+        --germline ighj_germline.fasta \
+        --output ${sample_id}_db-pass.tsv
+    """
+}
+
 process FILTER_PRODUCTIVE {
 
     tag "${sample_id}"
@@ -406,6 +454,25 @@ process FILTER_PRODUCTIVE {
             cp ${airr_tsv} ${sample_id}_productive.tsv
         fi
         """
+}
+
+process SUMMARIZE_VDJ {
+
+    publishDir "${params.results}/reports", mode: 'copy'
+
+    input:
+    path airr_tsvs
+    path summarize_script
+
+    output:
+    path "vdj_summary.tsv"
+
+    script:
+    """
+    python3 ${summarize_script} \
+        --inputs ${airr_tsvs} \
+        --output vdj_summary.tsv
+    """
 }
 
 process DEFINE_CLONES {

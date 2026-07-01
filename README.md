@@ -18,6 +18,8 @@ Step 2: bovine-repertoire-analysis (this repo)
   Consensus sequences → V(D)J annotation → diversity analysis + ultra-long CDR3H3 detection
 ```
 
+Run `bovine-igg-pipeline` with `--skip_annotation true` and do all V(D)J/CDR3 calling here instead. Its own optional annotation step (`--skip_annotation false`) calls IgBLAST with native AIRR output (`-outfmt 19`) and has no junction-inference fallback — without proper auxiliary data for the custom bovine J germlines, `junction`/`junction_aa`/`productive` come back blank for essentially every sequence. This pipeline's `INFER_JUNCTION` step (see [CDR3/Junction Calling](#cdrjunction-calling)) avoids that failure mode.
+
 ### Recommended workflow for ultra-long CDR3H3 detection
 
 If `main.nf` is running correctly:
@@ -63,6 +65,7 @@ python3 find_ultralong_cdrh3.py \
 ## Features
 
 - **V(D)J annotation** using IgBLAST
+- **CDR3/junction fallback calling** — backfills CDR3 calls IgBLAST's heuristic misses via J-gene anchor scanning (see [CDR3/Junction Calling](#cdrjunction-calling))
 - **Clonotype assignment** using Change-O
 - **Diversity analysis** using Alakazam:
   - CDR3 length distribution
@@ -135,10 +138,15 @@ This works automatically with any number of barcodes - no manual configuration n
 
 ```
 results/
-├── igblast/           # Raw IgBLAST annotations
-├── airr/              # AIRR-formatted sequence data
-├── filtered/          # Productive sequences only
-├── clones/            # Clone assignments
+├── igblast/                # Raw IgBLAST annotations
+├── airr/                   # AIRR-formatted sequence data (direct from MakeDb.py)
+├── airr_junction_filled/   # Same, with missing CDR3/junction calls backfilled
+│                           # (see CDR3/Junction Calling below)
+├── filtered/                # Productive sequences only
+├── clones/                  # Clone assignments
+├── reports/
+│   └── vdj_summary.tsv     # One row per sequence: barcode, chain, v/d/j_call,
+│                           # productive, v_identity, junction_aa_length, junction_source
 ├── diversity/
 │   ├── plots/         # PDF and PNG visualizations
 │   │   ├── cdr3_length_distribution.png
@@ -191,6 +199,21 @@ IMGT gaps are standardized insertions (shown as dots `.` in the sequence) that m
 - Correct reading frame determination
 
 Without gaps, the pipeline will run but produce empty CDR3 data and incorrect diversity metrics.
+
+---
+
+## CDR3/Junction Calling
+
+IgBLAST/Change-O's `MakeDb.py` sometimes leaves `junction`/`junction_aa` blank for a sequence even though it successfully assigned V/D/J genes — the pipeline's `INFER_JUNCTION` step (`main.nf`, using `bin/infer_missing_junction.py`) backfills these gaps.
+
+For heavy chain sequences (`IGHV` in `v_call`) with no `junction_aa`, it scans the sequence for the conserved J-region Trp codon (matched against the IGHJ germline) and walks back to the nearest upstream Cys codon — the same J-gene anchor method used by `find_ultralong_cdrh3.py`. Unlike that script, this fallback has no minimum length floor, since the goal is calling CDR3 length generally rather than just flagging ultra-long sequences. It only fills gaps — it never overwrites a junction IgBLAST already called.
+
+Every row gets a `junction_source` column:
+- `igblast` — IgBLAST/MakeDb.py called the junction directly
+- `anchor` — filled in by the J-gene anchor fallback
+- blank — neither method could confidently call it (e.g. ambiguous bases, non-standard 3′ ends, or a light-chain sequence contaminating a heavy-chain sample — the fallback is heavy-chain only, since light chain CDR3s are short and reliably called by IgBLAST already)
+
+In practice, most gaps turn out to be light-chain sequences misassigned into heavy-chain barcode files (see [Automatic Chain Filtering](#automatic-chain-filtering)) rather than genuine IgBLAST failures — check `v_call` before assuming a blank junction is a detection bug.
 
 ---
 
